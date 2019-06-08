@@ -2,14 +2,13 @@ JSONCutItem                     PROTO :DWORD                    ; Cut a json tre
 JSONCopyItem                    PROTO :DWORD, :DWORD            ; Copy (or cut) a json treeview item
 JSONPasteItem                   PROTO :DWORD, :DWORD            ; Paste a previously copied or cut json treeview item (from JSONCopyItem)
 
-JSONCopyBranch                  PROTO :DWORD, :DWORD            ; Copy (or cut) a json treeview branch
-JSONPasteBranch                 PROTO :DWORD, :DWORD            ; Paste a previously copied or cut json treeview branch (from JSONCopyBranch)
-JSONPasteBranchProcessNodes     PROTO :DWORD,:DWORD,:DWORD,:DWORD,:DWORD,:DWORD,:DWORD
+JSONCopyBranch                  PROTO :DWORD, :DWORD            ; NOT WORKING - WIP TODO - Copy (or cut) a json treeview branch
+JSONPasteBranch                 PROTO :DWORD, :DWORD            ; NOT WORKING - WIP TODO - Paste a previously copied or cut json treeview branch (from JSONCopyBranch)
+JSONPasteBranchProcessNodes     PROTO :DWORD,:DWORD,:DWORD,:DWORD,:DWORD,:DWORD,:DWORD ; NOT WORKING - WIP TODO
 
 PasteJSON                       PROTO :DWORD                    ; Paste / Import Json text from clipboard
 CopyToClipboard                 PROTO :DWORD, :DWORD            ; Copy to clipboard text or text value of treeview item
-
-CopyBranchToClipboard           PROTO :DWORD                    ; DONT USE - wip needs work done
+CopyBranchToClipboard           PROTO :DWORD, :DWORD            ; hWin, hItemClip
 
 
 
@@ -80,7 +79,7 @@ PasteJSON PROC USES EBX hWin:DWORD
     .ENDIF    
     Invoke CloseClipboard
     
-    
+    mov eax, TRUE
     ret
 PasteJSON ENDP
 
@@ -199,462 +198,74 @@ CopyToClipboard ENDP
 ;-------------------------------------------------------------------------------------
 ; Copies branch and all descendants to json formatted text to clipboard
 ;-------------------------------------------------------------------------------------
-CopyBranchToClipboard PROC USES EBX hWin:DWORD
-    LOCAL hCurrentChild:DWORD
-    LOCAL hCheckItem:DWORD
+CopyBranchToClipboard PROC hWin:DWORD, hItem:DWORD
+    LOCAL hItemClip:DWORD
     LOCAL LenData:DWORD
-    LOCAL dwLevel:DWORD
-    LOCAL dwSpacingLevel:DWORD
-    LOCAL jsontype:DWORD
-    LOCAL lpszItemName:DWORD
-    LOCAL dwChildrenCount:DWORD
     LOCAL ptrClipboardData:DWORD
     LOCAL hClipData:DWORD
     LOCAL pClipData:DWORD
-    LOCAL dwLenSelectedTreeviewText
-    LOCAL dwColonPos:DWORD
-    LOCAL dwMaxSize:DWORD
+    LOCAL hJSON:DWORD
     
-    Invoke TreeViewGetSelectedItem, hTV
-    .IF eax == NULL
-        ret
-    .ENDIF
-    mov hCurrentChild, eax
-    
-    mov dwLevel, 0
-    mov dwSpacingLevel, 0
-
-    Invoke TreeViewCountChildren, hTV, hCurrentChild, TRUE
-    mov dwChildrenCount, eax
-    IFDEF DEBUG32
-    PrintDec dwChildrenCount
-    ENDIF
-    ; estimate space for clipboard: no children and items in branch x 1024d 
-    ; (+ each item requires up to 4 quotes and comma, cr, lf) + indent spacing per line + brackets or array brackets pairs) (11)
-    ; estimate 10 spaces per item for indenting (10)
-    ; = 1048 x no children
-    
-    mov eax, dwChildrenCount
-    mov ebx, JSON_ITEM_MAX_TEXTLENGTH 
-    add ebx, 64d ;1048d
-    mul ebx
-    mov dwMaxSize, eax
-    
-    Invoke GlobalAlloc, GMEM_FIXED + GMEM_ZEROINIT, dwMaxSize
-    .IF eax == NULL
-        ret
-    .ENDIF
-    mov ptrClipboardData, eax    
-
-    Invoke OpenClipboard, hWin
-    .IF eax == 0
-        Invoke GlobalFree, ptrClipboardData
-        ret
-    .ENDIF
-    Invoke EmptyClipboard
-
-
-
-;szJSONExportStart           DB '{',13,10,0
-;szJSONExportEnd             DB '}',13,10,0
-;szJSONExportArrayStart      DB '[',13,10,0
-;szJSONExportArrayEnd        DB ']',13,10,0
-;szJSONExportArrayEmpty      DB '[]',13,10,0
-;szJSONExportCRLF            DB 13,10,0
-;szJSONExportCommaCRLF       DB ',',13,10,0
-;szJSONExportMiddleString    DB '": "',0
-;szJSONExportMiddleOther     DB '": ',0
-;szJSONExportIndentSpaces    DB 32 DUP (32d)
-
-
-    Invoke szCopy, Addr szJSONExportStart, ptrClipboardData
-
-    Invoke TreeViewGetItemText, hTV, hCurrentChild, Addr szSelectedTreeviewText, SIZEOF szSelectedTreeviewText
-    Invoke szLen, Addr szSelectedTreeviewText
-    mov dwLenSelectedTreeviewText, eax
-    Invoke TreeViewGetItemParam, hTV, hCurrentChild
-    ;PrintDec eax
-    .IF eax != NULL
-        mov ebx, eax
-        mov eax, [ebx].cJSON.itemtype
-        mov jsontype, eax
-        mov eax, [ebx].cJSON.itemstring
-        mov lpszItemName, eax
-        mov eax, [ebx].cJSON.valuestring
-        mov lpszItemString, eax
-        ;PrintDec jsontype
-        mov eax, jsontype
-        .IF eax == cJSON_Object
-            IFDEF DEBUG32
-            PrintText 'cJSON_Object'
-            ENDIF
-            Invoke szCatStr, ptrClipboardData, Addr szSpace
-            Invoke szCatStr, ptrClipboardData, Addr szJSONExportObjectStart
-            
-            .IF lpszItemName != NULL
-                Invoke szCatStr, ptrClipboardData, Addr szSpace
-                Invoke szCatStr, ptrClipboardData, Addr szQuote
-                Invoke szCatStr, ptrClipboardData, lpszItemName
-                Invoke szCatStr, ptrClipboardData, Addr szQuote
-                Invoke szCatStr, ptrClipboardData, Addr szColon                
-            .ELSE
-                ;Invoke szCatStr, ptrClipboardData, Addr szObject
-            .ENDIF
-            ;Invoke szCatStr, ptrClipboardData, Addr szJSONExportCRLF
-        .ELSEIF eax == cJSON_Array
-            IFDEF DEBUG32
-            PrintText 'cJSON_Array'
-            ENDIF
-            Invoke szCatStr, ptrClipboardData, Addr szSpace
-            Invoke szCatStr, ptrClipboardData, Addr szQuote
-            .IF lpszItemName != NULL
-                Invoke szCatStr, ptrClipboardData, lpszItemName
-            .ELSE
-                Invoke szCatStr, ptrClipboardData, Addr szArray
-            .ENDIF
-            Invoke szCatStr, ptrClipboardData, Addr szQuote
-            Invoke szCatStr, ptrClipboardData, Addr szColon
-            Invoke szCatStr, ptrClipboardData, Addr szSpace
-            Invoke szCatStr, ptrClipboardData, Addr szLeftSquareBracket
-            ;Invoke szCatStr, ptrClipboardData, Addr szJSONExportCRLF
-        .ENDIF
-        inc dwSpacingLevel
-    .ENDIF
-    IFDEF DEBUG32
-    PrintText 'TVM_GETNEXTITEM, TVGN_CHILD'
-    ENDIF
-    push hCurrentChild
-    Invoke SendMessage, hTV, TVM_GETNEXTITEM, TVGN_CHILD, hCurrentChild
-    .WHILE eax != NULL
-        mov hCurrentChild, eax      
-        
-        .IF dwSpacingLevel != 0
-            Invoke szLeft, Addr szJSONExportIndentSpaces, Addr szJSONExportSpacesBuffer, dwSpacingLevel
-            Invoke szCatStr, ptrClipboardData, Addr szJSONExportSpacesBuffer
-        .ENDIF
-        
-        IFDEF DEBUG32
-        PrintText 'TreeViewGetItemText hCurrentChild'
-        ENDIF
-        Invoke TreeViewGetItemText, hTV, hCurrentChild, Addr szSelectedTreeviewText, SIZEOF szSelectedTreeviewText
+    .IF hItem == 0
+        Invoke SendMessage, hTV, TVM_GETNEXTITEM, TVGN_ROOT, NULL
         .IF eax == 0
-            IFDEF DEBUG32
-            PrintText 'TreeViewGetItemText error'
-            ENDIF
+            ret
+        .ENDIF
+    .ELSE
+        mov eax, hItem
+    .ENDIF
+    mov hItemClip, eax
+
+    Invoke TreeViewGetItemParam, hTV, hItemClip
+    mov hJSON, eax
+    .IF hJSON == NULL
+        xor eax, eax
+        ret
+    .ENDIF
+    
+    Invoke cJSON_PrintBuffered, hJSON, 4096d, TRUE
+    .IF eax != NULL
+        mov ptrClipboardData, eax
+        
+        Invoke OpenClipboard, hWin
+        .IF eax == 0
+            Invoke cJSON_free, ptrClipboardData
+            xor eax, eax
+            ret
+        .ENDIF
+        Invoke EmptyClipboard
+        
+        Invoke szLen, ptrClipboardData
+        mov LenData, eax
+        inc eax
+        Invoke GlobalAlloc, GMEM_MOVEABLE, eax ;+GMEM_DDESHARE
+        .IF eax == NULL
             Invoke GlobalFree, ptrClipboardData
             Invoke CloseClipboard
             ret
         .ENDIF
+        mov hClipData, eax
         
-        IFDEF DEBUG32
-        PrintText 'TreeViewGetItemText Length'
-        ENDIF
-        
-        Invoke szLen, Addr szSelectedTreeviewText
-        mov dwLenSelectedTreeviewText, eax
-        
-        IFDEF DEBUG32
-        PrintString szSelectedTreeviewText
-        ENDIF
-        
-        Invoke TreeViewGetItemParam, hTV, hCurrentChild
-        ;PrintDec eax
-        .IF eax != NULL
-            mov ebx, eax
-            mov eax, [ebx].cJSON.itemtype
-            mov jsontype, eax
-            mov eax, [ebx].cJSON.itemstring
-            mov lpszItemName, eax
-            mov eax, [ebx].cJSON.valuestring
-            mov lpszItemString, eax
-            ;PrintDec jsontype
-            mov eax, jsontype
-            .IF eax == cJSON_Object
-                IFDEF DEBUG32
-                PrintText 'cJSON_Object'
-                ENDIF
-                Invoke szCatStr, ptrClipboardData, Addr szJSONExportObjectStart
-                ;Invoke szCatStr, ptrClipboardData, Addr szJSONExportSpacesBuffer
-                
-                .IF lpszItemName != NULL
-                    Invoke szCatStr, ptrClipboardData, Addr szQuote
-                    Invoke szCatStr, ptrClipboardData, lpszItemName
-                    Invoke szCatStr, ptrClipboardData, Addr szQuote
-                    Invoke szCatStr, ptrClipboardData, Addr szColon
-                .ELSE
-                    ;Invoke szCatStr, ptrClipboardData, Addr szObject
-                .ENDIF
-                inc dwSpacingLevel
- 
-            .ELSEIF eax == cJSON_Array
-                IFDEF DEBUG32
-                PrintText 'cJSON_Array'
-                ENDIF
-                Invoke szCatStr, ptrClipboardData, Addr szQuote
-                .IF lpszItemName != NULL
-                    Invoke szCatStr, ptrClipboardData, lpszItemName
-                .ELSE
-                    Invoke szCatStr, ptrClipboardData, Addr szArray
-                .ENDIF
-                Invoke szCatStr, ptrClipboardData, Addr szQuote
-                Invoke szCatStr, ptrClipboardData, Addr szColon                
-                Invoke szCatStr, ptrClipboardData, Addr szSpace
-                Invoke szCatStr, ptrClipboardData, Addr szLeftSquareBracket
-                inc dwSpacingLevel
-                
-            .ELSEIF eax == cJSON_String
-                IFDEF DEBUG32
-                PrintText 'cJSON_String'
-                ENDIF
-                Invoke szCatStr, ptrClipboardData, Addr szQuote
-                
-                Invoke InString, 1, Addr szSelectedTreeviewText, Addr szColon
-                mov dwColonPos, eax
-                .IF eax != 0 ; match                
-                    Invoke szLeft, Addr szSelectedTreeviewText, Addr szItemTextValue, dwColonPos
-                    Invoke szCatStr, ptrClipboardData, Addr szItemTextValue
-                    Invoke szCatStr, ptrClipboardData, Addr szJSONExportMiddleString
-                .ELSE
-                    IFDEF DEBUG32
-                    PrintText '!!!'
-                    ENDIF
-                .ENDIF
-                
-                mov ebx, dwColonPos
-                mov eax, dwLenSelectedTreeviewText
-                sub eax, ebx
-                .IF sdword ptr eax > 1
-                    dec eax ; skip any space
-                    Invoke szRight, Addr szSelectedTreeviewText, Addr szItemTextValue, eax
-                    Invoke szCatStr, ptrClipboardData, Addr szItemTextValue
-                .ENDIF
-                Invoke szCatStr, ptrClipboardData, Addr szQuote
-                
-            .ELSEIF eax == cJSON_Number
-                IFDEF DEBUG32
-                PrintText 'cJSON_Number'
-                ENDIF
-            .ELSEIF eax == cJSON_True
-                IFDEF DEBUG32
-                PrintText 'cJSON_True'
-                ENDIF
-;                Invoke szCatStr, ptrClipboardData, Addr szQuote
-;                Invoke InString, 1, Addr szSelectedTreeviewText, Addr szColon
-;                mov dwColonPos, eax
-;                .IF eax != 0 ; match
-;                    Invoke szLeft, Addr szSelectedTreeviewText, Addr szItemTextValue, dwColonPos
-;                    Invoke szCatStr, ptrClipboardData, Addr szItemTextValue
-;                    Invoke szCatStr, ptrClipboardData, Addr szJSONExportMiddleOther
-;                .ELSE
-;                    PrintText '!!!'
-;                .ENDIF
-;                mov ebx, dwColonPos
-;                mov eax, dwLenSelectedTreeviewText
-;                sub eax, ebx
-;                dec eax
-;                Invoke szRight, Addr szSelectedTreeviewText, Addr szItemTextValue, eax
-;                Invoke szCatStr, ptrClipboardData, Addr szItemTextValue
-
-                
-            .ELSEIF eax == cJSON_False
-                IFDEF DEBUG32
-                PrintText 'cJSON_False'
-                ENDIF
-            .ELSEIF eax == cJSON_Invalid
-                IFDEF DEBUG32
-                PrintText 'cJSON_Invalid'
-                ENDIF
-            .ENDIF
-            
-            mov eax, jsontype
-            .IF eax == cJSON_Number || eax == cJSON_True || eax == cJSON_False || eax == cJSON_Invalid
-                Invoke szCatStr, ptrClipboardData, Addr szQuote
-                Invoke InString, 1, Addr szSelectedTreeviewText, Addr szColon
-                mov dwColonPos, eax
-                .IF eax != 0 ; match
-                    Invoke szLeft, Addr szSelectedTreeviewText, Addr szItemTextValue, dwColonPos
-                    Invoke szCatStr, ptrClipboardData, Addr szItemTextValue
-                    Invoke szCatStr, ptrClipboardData, Addr szJSONExportMiddleOther
-                .ELSE
-                    IFDEF DEBUG32
-                    PrintText '!!!'
-                    ENDIF
-                .ENDIF
-                mov ebx, dwColonPos
-                mov eax, dwLenSelectedTreeviewText
-                sub eax, ebx
-                .IF sdword ptr eax > 1
-                    dec eax ; skip any space
-                    Invoke szRight, Addr szSelectedTreeviewText, Addr szItemTextValue, eax
-                    Invoke szCatStr, ptrClipboardData, Addr szItemTextValue
-                .ENDIF
-            .ENDIF
-             
+        Invoke GlobalLock, hClipData
+        .IF eax == NULL
+            Invoke GlobalFree, ptrClipboardData
+            Invoke GlobalFree, hClipData
+            Invoke CloseClipboard
+            ret
         .ENDIF
+        mov pClipData, eax
+        mov eax, LenData
+        Invoke RtlMoveMemory, pClipData, ptrClipboardData, eax
         
-        
-        mov LenData, eax
-        
-        Invoke SendMessage, hTV, TVM_GETNEXTITEM, TVGN_CHILD, hCurrentChild
-        .IF eax != 0
-            inc dwLevel
-            inc dwSpacingLevel
-            IFDEF DEBUG32
-            PrintDec hCurrentChild
-            ENDIF
-            push hCurrentChild
-            mov hCurrentChild, eax
-        .ENDIF
-        
-        ;mov eax, hCurrentChild
-        ;mov hCheckItem, eax
-        Invoke SendMessage, hTV, TVM_GETNEXTITEM, TVGN_NEXT, hCurrentChild
-        mov hCurrentChild, eax
-        .IF eax == 0
-            IFDEF DEBUG32
-            PrintText 'TVM_GETNEXTITEM == 0 '
-            ENDIF
-            Invoke szCatStr, ptrClipboardData, Addr szJSONExportCRLF
-            
-            ; pop always, then check for last object type?
-            
-            .IF dwLevel != 0
-                IFDEF DEBUG32
-                PrintText 'dwLevel != 0'
-                ENDIF
-                dec dwLevel
-                dec dwSpacingLevel
-                pop hCurrentChild
-                mov eax, hCurrentChild
-                mov hCheckItem, eax
-                Invoke SendMessage, hTV, TVM_GETNEXTITEM, TVGN_NEXT, hCurrentChild
-                mov hCurrentChild, eax
-                
-                .IF dwSpacingLevel != 0
-                    Invoke szLeft, Addr szJSONExportIndentSpaces, Addr szJSONExportSpacesBuffer, dwSpacingLevel
-                    Invoke szCatStr, ptrClipboardData, Addr szJSONExportSpacesBuffer                
-                .ENDIF
-                
-                mov eax, hCurrentChild
-                .IF eax == 0
-                    Invoke szCatStr, ptrClipboardData, Addr szJSONExportObjectEnd
-                .ELSE
-                    Invoke szCatStr, ptrClipboardData, Addr szJSONExportObjectCommaEnd
-                .ENDIF
-                IFDEF DEBUG32
-                PrintText 'Checking Last objects'
-                PrintDec hCheckItem
-                ENDIF
-                Invoke TreeViewGetItemParam, hTV, hCheckItem
-                ;PrintDec eax
-                .IF eax != NULL
-                    mov ebx, eax
-                    mov eax, [ebx].cJSON.itemtype                
-                    .IF eax == cJSON_Object
-                        IFDEF DEBUG32
-                        PrintText 'Last objects: cJSON_Object'
-                        ENDIF
-                    .ELSEIF eax == cJSON_Array
-                        IFDEF DEBUG32
-                        PrintText 'Last objects: cJSON_Array'
-                        ENDIF
-                    .ENDIF
-                .ENDIF                
-                
-            .ELSE
-                IFDEF DEBUG32
-                PrintText 'dwLevel == 0'
-                ENDIF
-                pop hCurrentChild
-                mov eax, hCurrentChild
-                mov hCheckItem, eax
-                
-                IFDEF DEBUG32
-                PrintText 'Checking Last objects'
-                PrintDec hCheckItem
-                ENDIF
-                Invoke TreeViewGetItemParam, hTV, hCheckItem
-                ;PrintDec eax
-                .IF eax != NULL
-                    mov ebx, eax
-                    mov eax, [ebx].cJSON.itemtype                
-                    .IF eax == cJSON_Object
-                        IFDEF DEBUG32
-                        PrintText 'Last objects: cJSON_Object'
-                        ENDIF
-                    .ELSEIF eax == cJSON_Array
-                        IFDEF DEBUG32
-                        PrintText 'Last objects: cJSON_Array'
-                        ENDIF
-                    .ENDIF
-                .ENDIF                   
-                
-            .ENDIF
-        .ELSE
-            mov eax, jsontype
-            .IF eax == cJSON_Object || eax == cJSON_Array
-                ;Invoke szCatStr, ptrClipboardData, Addr szJSONExportCRLF
-            .ELSE
-                Invoke szCatStr, ptrClipboardData, Addr szJSONExportCommaCRLF
-            .ENDIF
-        .ENDIF
+        Invoke GlobalUnlock, hClipData 
+        invoke SetClipboardData, CF_TEXT, hClipData
 
-        mov eax, hCurrentChild
-    .ENDW
-
-    pop hCurrentChild
-                mov eax, hCurrentChild
-                mov hCheckItem, eax
-               Invoke TreeViewGetItemParam, hTV, hCheckItem
-                ;PrintDec eax
-                .IF eax != NULL
-                    mov ebx, eax
-                    mov eax, [ebx].cJSON.itemtype                
-                    .IF eax == cJSON_Object
-                        IFDEF DEBUG32
-                        PrintText 'Last objects: cJSON_Object'
-                        ENDIF
-                    .ELSEIF eax == cJSON_Array
-                        IFDEF DEBUG32
-                        PrintText 'Last objects: cJSON_Array'
-                        ENDIF
-                    .ENDIF
-                .ENDIF                       
-    
-    
-    Invoke szCatStr, ptrClipboardData, Addr szJSONExportEnd 
-
-
-    ;DbgDump ptrClipboardData, dwMaxSize
-    
-    Invoke szLen, ptrClipboardData
-    mov LenData, eax
-    inc eax
-    Invoke GlobalAlloc, GMEM_MOVEABLE, eax ;+GMEM_DDESHARE
-    .IF eax == NULL
-        Invoke GlobalFree, ptrClipboardData
         Invoke CloseClipboard
-        ret
+        Invoke cJSON_free, ptrClipboardData
+        mov eax, TRUE
+    .ELSE
+        xor eax, eax
     .ENDIF
-    mov hClipData, eax
-    
-    Invoke GlobalLock, hClipData
-    .IF eax == NULL
-        Invoke GlobalFree, ptrClipboardData
-        Invoke GlobalFree, hClipData
-        Invoke CloseClipboard
-        ret
-    .ENDIF
-    mov pClipData, eax
-    mov eax, LenData
-    Invoke RtlMoveMemory, pClipData, ptrClipboardData, eax
-    
-    Invoke GlobalUnlock, hClipData 
-    invoke SetClipboardData, CF_TEXT, hClipData
-
-    Invoke CloseClipboard
-    Invoke GlobalFree, ptrClipboardData
-
     ret
 CopyBranchToClipboard ENDP
 

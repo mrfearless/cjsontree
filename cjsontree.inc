@@ -18,8 +18,16 @@ includelib masm32.lib
 include TreeView.inc
 includelib TreeView.lib
 
+IFDEF LIBCJSON
 include libcjson.inc
 includelib libcjson.lib
+ELSE
+include msvcrt.inc
+includelib msvcrt.lib
+includelib msvcrt14.lib
+include cjson_x86.inc
+includelib cjson_x86.lib
+ENDIF
 
 IFDEF EXPERIMENTAL_ARRAYNAME_STACK
 include VirtualStack.inc
@@ -56,6 +64,32 @@ EditLabelTextLength             PROTO :DWORD
 
 JustFnameExt                    PROTO :DWORD, :DWORD                ; Strips path from full filepath to leave just the filename and extension
 NewLineReplace                  PROTO :DWORD, :DWORD
+
+
+cJSON_AddNumberToObjectEx       PROTO :DWORD, :DWORD, :DWORD        ; 
+
+IFDEF LIBCJSON
+cJSON_AddObjectToObject         PROTO :DWORD, :DWORD
+cJSON_AddArrayToObject          PROTO :DWORD, :DWORD
+cJSON_AddNullToObject           PROTO :DWORD, :DWORD
+cJSON_AddTrueToObject           PROTO :DWORD, :DWORD
+cJSON_AddFalseToObject          PROTO :DWORD, :DWORD
+cJSON_AddBoolToObject           PROTO :DWORD, :DWORD, :DWORD
+cJSON_AddNumberToObject         PROTO :DWORD, :DWORD, :DWORD
+cJSON_AddStringToObject         PROTO :DWORD, :DWORD, :DWORD
+cJSON_AddRawToObject            PROTO :DWORD, :DWORD, :DWORD
+ENDIF
+
+cJSON_AddObjectToArray          PROTO :DWORD
+cJSON_AddArrayToArray           PROTO :DWORD
+cJSON_AddNullToArray            PROTO :DWORD
+cJSON_AddTrueToArray            PROTO :DWORD
+cJSON_AddFalseToArray           PROTO :DWORD
+cJSON_AddBoolToArray            PROTO :DWORD, :DWORD
+cJSON_AddNumberToArray          PROTO :DWORD, :DWORD
+cJSON_AddStringToArray          PROTO :DWORD, :DWORD
+cJSON_AddRawToArray             PROTO :DWORD, :DWORD
+
 
 .CONST
 ;-----------------------------------------------------------------------------------------
@@ -210,6 +244,8 @@ g_DragMode                      DD FALSE
 g_fShown                        DD FALSE
 g_ShowJsonType                  DD FALSE ;TRUE ; shows ': Object' or ': Array' after object / array iterator items 
 g_Edit                          DD FALSE ; if file was edited
+g_Save                          DD FALSE ; if save buttons/menus are allowed
+g_SaveAs                        DD FALSE ; if saveas button/menus are allowed
 g_nTVIndex                      DD 0
 g_hCutCopyNode                  DD NULL
 g_Cut                           DD FALSE

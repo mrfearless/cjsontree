@@ -262,7 +262,7 @@ JSONCreateItem PROC USES EBX hTreeview:DWORD, hParentItem:DWORD, dwJsonObjectTyp
         
     .ELSEIF eax == cJSON_Number
         .IF bArray == FALSE
-            Invoke cJSON_AddNumberToObject, hJSONParent, Addr szNullNull, 0
+            Invoke cJSON_AddNumberToObjectEx, hJSONParent, Addr szNullNull, 0
         .ELSE
             Invoke cJSON_AddNumberToArray, hJSONParent, 0
         .ENDIF

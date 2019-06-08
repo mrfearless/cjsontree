@@ -227,7 +227,7 @@ szMRUErrorMessage           DB 512 dup (0)
 hTVMenu                     DD ? ; Right click menu
 hTVAddMenu                  DD ? ; 'Add' submenu
 
-
+; Menu add shortcut key to text add tab \t - &New\tCtrl+N - right align them you use \a instead of \t &New\aCtrl+N
 .CODE
 
 
@@ -440,25 +440,26 @@ MenuRCInit PROC hWin:DWORD
 ;    Invoke AppendMenu, hTVMenu, MF_STRING, IDM_CMD_COPY_BRANCH, Addr szTVRCMenuCopyBranch
     ;Invoke AppendMenu, hTVMenu, MF_SEPARATOR, 0, 0
     ;Invoke AppendMenu, hTVMenu, MF_STRING, IDM_CMD_PASTE_JSON, Addr szTVRCMenuPasteJSON
+    
+    
+    ; Add submenu 'Export' to rght click menu
     Invoke AppendMenu, hTVMenu, MF_SEPARATOR, 0, 0
+    Invoke MenuRCExportInit, hWin
+    mov hSubMenu, eax
+    mov mi.cbSize, SIZEOF MENUITEMINFO
+    mov mi.fMask, MIIM_SUBMENU + MIIM_STRING + MIIM_ID
+    mov mi.wID, IDM_CMD_EXPORT
+    mov eax, hSubMenu
+    mov mi.hSubMenu, eax
+    lea eax, szTVRCMenuExport
+    mov mi.dwTypeData, eax
+    Invoke InsertMenuItem, hTVMenu, IDM_CMD_EXPORT, FALSE, Addr mi
+    mov mi.fMask, MIIM_STATE
+    mov mi.wID, 0
+    mov mi.hSubMenu, 0
+    mov mi.dwTypeData, 0    
     
-;    ; Add submenu 'Export' to rght click menu
-;    Invoke MenuRCExportInit, hWin
-;    mov hSubMenu, eax
-;    mov mi.cbSize, SIZEOF MENUITEMINFO
-;    mov mi.fMask, MIIM_SUBMENU + MIIM_STRING + MIIM_ID
-;    mov mi.wID, IDM_CMD_EXPORT
-;    mov eax, hSubMenu
-;    mov mi.hSubMenu, eax
-;    lea eax, szTVRCMenuExport
-;    mov mi.dwTypeData, eax
-;    Invoke InsertMenuItem, hTVMenu, IDM_CMD_EXPORT, FALSE, Addr mi
-;    mov mi.fMask, MIIM_STATE
-;    mov mi.wID, 0
-;    mov mi.hSubMenu, 0
-;    mov mi.dwTypeData, 0    
-    
-    
+    Invoke AppendMenu, hTVMenu, MF_SEPARATOR, 0, 0
     Invoke AppendMenu, hTVMenu, MF_STRING, IDM_CMD_FIND, Addr szTVRCMenuFindText 
     Invoke AppendMenu, hTVMenu, MF_SEPARATOR, 0, 0
     Invoke AppendMenu, hTVMenu, MF_STRING, IDM_CMD_COLLAPSE_BRANCH, Addr szTVRCMenuCollapseBranch
@@ -500,6 +501,10 @@ MenuRCInit PROC hWin:DWORD
     Invoke LoadBitmap, hInstance, BMP_CMD_DEL_ITEM
     mov hBitmap, eax
     Invoke SetMenuItemBitmaps, hTVMenu, IDM_CMD_DEL_ITEM, MF_BYCOMMAND, hBitmap, 0
+
+    Invoke LoadBitmap, hInstance, BMP_CMD_EXPORT
+    mov hBitmap, eax
+    Invoke SetMenuItemBitmaps, hTVMenu, IDM_CMD_EXPORT, MF_BYCOMMAND, hBitmap, 0
 
     ; Set inital state for some menu items
     mov mi.fState, MFS_GRAYED
@@ -1140,8 +1145,10 @@ MenuSaveEnable PROC hWin:DWORD, bEnable:DWORD
     mov hMainMenu, eax
     
     .IF bEnable == TRUE
+        mov g_Save, TRUE
         mov mi.fState, MFS_ENABLED
     .ELSE
+        mov g_Save, FALSE
         mov mi.fState, MFS_GRAYED
     .ENDIF
     Invoke SetMenuItemInfo, hMainMenu, IDM_FILE_SAVE, FALSE, Addr mi
@@ -1163,8 +1170,10 @@ MenuSaveAsEnable PROC hWin:DWORD, bEnable:DWORD
     mov hMainMenu, eax
     
     .IF bEnable == TRUE
+        mov g_SaveAs, TRUE
         mov mi.fState, MFS_ENABLED
     .ELSE
+        mov g_SaveAs, FALSE
         mov mi.fState, MFS_GRAYED
     .ENDIF
     Invoke SetMenuItemInfo, hMainMenu, IDM_FILE_SAVEAS, FALSE, Addr mi 

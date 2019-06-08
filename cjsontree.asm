@@ -22,6 +22,7 @@ IFDEF DEBUG32
     include M:\Masm32\include\debug32.inc
 ENDIF
 
+;LIBCJSON EQU 1 ; comment out to use cjson.lib library instead of libcjson.lib 
 
 include cjsontree.inc
 include statusbar.asm
@@ -164,10 +165,17 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
             ;Invoke ToolbarButtonSaveEnable, hWin, TRUE
         
         .ELSEIF eax == IDM_FILE_SAVE || eax == ACC_FILE_SAVE || eax == TB_FILE_SAVE
-            Invoke JSONFileSave, hWin, FALSE
-        
+            .IF g_Edit == TRUE && g_Save == TRUE
+                Invoke JSONFileSave, hWin, FALSE
+            .ENDIF
+            
         .ELSEIF eax == IDM_FILE_SAVEAS || eax == ACC_FILE_SAVEAS || eax == TB_FILE_SAVEAS
-            Invoke JSONFileSave, hWin, TRUE
+            .IF g_SaveAs == TRUE
+                Invoke TreeViewCountItems, hTV
+                .IF eax != 0
+                    Invoke JSONFileSave, hWin, TRUE
+                .ENDIF
+            .ENDIF
         
         .ELSEIF eax == IDM_HELP_ABOUT
             Invoke ShellAbout,hWin,addr AppName,addr AboutMsg,NULL
@@ -213,6 +221,15 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
             
         .ELSEIF eax == IDM_CMD_EXPORT_ROOT_FILE
             Invoke ExportJSONBranchToFile, hWin, 0
+        
+        .ELSEIF eax == IDM_CMD_EXPORT_BRANCH_CLIP
+            Invoke TreeViewGetSelectedItem, hTV
+            .IF eax != 0        
+                Invoke CopyBranchToClipboard, hWin, eax
+            .ENDIF
+            
+        .ELSEIF eax == IDM_CMD_EXPORT_ROOT_CLIP
+            Invoke CopyBranchToClipboard, hWin, 0
         
         .ELSEIF eax == IDM_CMD_COLLAPSE_BRANCH
             Invoke TreeViewGetSelectedItem, hTV
@@ -959,6 +976,8 @@ JSONFileClose PROC hWin:DWORD
         mov hJSON_Object_Root, NULL
     .ENDIF
 
+    Invoke RtlZeroMemory, Addr JsonOpenedFilename, SIZEOF JsonOpenedFilename
+
     Invoke ResetGUI, hWin
     Invoke SetFocus, hTV
 
@@ -1054,16 +1073,15 @@ JSONFileSave PROC hWin:DWORD, bSaveAs:DWORD
             
             Invoke IniMRUEntrySaveFilename, hWin, Addr JsonSavedFilename
             Invoke IniMRUReloadListToMenu, hWin
+            mov eax, TRUE
         .ELSE
             Invoke szCopy, Addr szJSONSaveFileFailed, Addr szJSONErrorMessage
             Invoke szCatStr, Addr szJSONErrorMessage, Addr JsonSavedFilename
-            Invoke StatusBarSetPanelText, 2, Addr szJSONErrorMessage            
+            Invoke StatusBarSetPanelText, 2, Addr szJSONErrorMessage
+            mov eax, FALSE
         .ENDIF
-
     .ENDIF    
-    
     ret
-
 JSONFileSave ENDP
 
 
@@ -1855,6 +1873,195 @@ NewLineReplace PROC USES EBX EDI ESI src:DWORD,dst:DWORD
     ret
 
 NewLineReplace ENDP
+
+cJSON_AddNumberToObjectEx PROC hJSON:DWORD, lpszName:DWORD, dwNumberValue:DWORD
+    LOCAL hJSONObjectNumber:DWORD
+    LOCAL qwNumberValue:QWORD
+    mov eax, dwNumberValue
+    mov dword ptr [qwNumberValue+0], eax
+    mov dword ptr [qwNumberValue+4], eax
+    Invoke cJSON_CreateNumber, qwNumberValue
+    mov hJSONObjectNumber, eax
+    Invoke cJSON_AddItemToObject, hJSON, lpszName, hJSONObjectNumber
+    mov eax, hJSONObjectNumber
+    ret
+cJSON_AddNumberToObjectEx ENDP
+
+IFDEF LIBCJSON
+
+; Add To Object
+cJSON_AddObjectToObject PROC hJSON:DWORD, lpszName:DWORD
+    LOCAL hJSONObject:DWORD
+    Invoke cJSON_CreateObject
+    mov hJSONObject, eax
+    Invoke cJSON_AddItemToObject, hJSON, lpszName, hJSONObject
+    mov eax, hJSONObject
+    ret
+cJSON_AddObjectToObject ENDP
+
+cJSON_AddArrayToObject PROC hJSON:DWORD, lpszName:DWORD
+    LOCAL hJSONObjectArray:DWORD
+    Invoke cJSON_CreateArray
+    mov hJSONObjectArray, eax
+    Invoke cJSON_AddItemToObject, hJSON, lpszName, hJSONObjectArray
+    mov eax, hJSONObjectArray
+    ret
+cJSON_AddArrayToObject ENDP
+
+cJSON_AddNullToObject PROC hJSON:DWORD, lpszName:DWORD
+    LOCAL hJSONObjectNull:DWORD
+    Invoke cJSON_CreateNull
+    mov hJSONObjectNull, eax
+    Invoke cJSON_AddItemToObject, hJSON, lpszName, hJSONObjectNull
+    mov eax, hJSONObjectNull
+    ret
+cJSON_AddNullToObject ENDP
+
+cJSON_AddTrueToObject PROC hJSON:DWORD, lpszName:DWORD
+    LOCAL hJSONObjectTrue:DWORD
+    Invoke cJSON_CreateTrue
+    mov hJSONObjectTrue, eax
+    Invoke cJSON_AddItemToObject, hJSON, lpszName, hJSONObjectTrue
+    mov eax, hJSONObjectTrue
+    ret
+cJSON_AddTrueToObject ENDP
+
+cJSON_AddFalseToObject PROC hJSON:DWORD, lpszName:DWORD
+    LOCAL hJSONObjectFalse:DWORD
+    Invoke cJSON_CreateFalse
+    mov hJSONObjectFalse, eax
+    Invoke cJSON_AddItemToObject, hJSON, lpszName, hJSONObjectFalse
+    mov eax, hJSONObjectFalse
+    ret
+cJSON_AddFalseToObject ENDP
+
+cJSON_AddBoolToObject PROC hJSON:DWORD, lpszName:DWORD, dwBoolValue:DWORD
+    LOCAL hJSONObjectBool:DWORD
+    Invoke cJSON_CreateBool, dwBoolValue
+    mov hJSONObjectBool, eax
+    Invoke cJSON_AddItemToObject, hJSON, lpszName, hJSONObjectBool
+    mov eax, hJSONObjectBool
+    ret
+cJSON_AddBoolToObject ENDP
+
+cJSON_AddNumberToObject PROC hJSON:DWORD, lpszName:DWORD, dwNumberValue:DWORD
+    LOCAL hJSONObjectNumber:DWORD
+    LOCAL qwNumberValue:QWORD
+    mov eax, dwNumberValue
+    mov dword ptr [qwNumberValue+0], eax
+    mov dword ptr [qwNumberValue+4], eax
+    Invoke cJSON_CreateNumber, qwNumberValue
+    mov hJSONObjectNumber, eax
+    Invoke cJSON_AddItemToObject, hJSON, lpszName, hJSONObjectNumber
+    mov eax, hJSONObjectNumber
+    ret
+cJSON_AddNumberToObject ENDP
+
+cJSON_AddStringToObject PROC hJSON:DWORD, lpszName:DWORD, lpszString:DWORD
+    LOCAL hJSONObjectString:DWORD
+    Invoke cJSON_CreateString, lpszString
+    mov hJSONObjectString, eax
+    Invoke cJSON_AddItemToObject, hJSON, lpszName, hJSONObjectString
+    mov eax, hJSONObjectString
+    ret
+cJSON_AddStringToObject ENDP
+
+cJSON_AddRawToObject PROC hJSON:DWORD, lpszName:DWORD, lpszRawJson:DWORD
+    LOCAL hJSONObjectRaw:DWORD
+    Invoke cJSON_CreateRaw, lpszRawJson
+    mov hJSONObjectRaw, eax
+    Invoke cJSON_AddItemToObject, hJSON, lpszName, hJSONObjectRaw
+    mov eax, hJSONObjectRaw
+    ret
+cJSON_AddRawToObject ENDP
+
+ENDIF
+
+; Add To Array
+cJSON_AddObjectToArray PROC hJSON:DWORD
+    LOCAL hJSONObject:DWORD
+    Invoke cJSON_CreateObject
+    mov hJSONObject, eax
+    Invoke cJSON_AddItemToArray, hJSON, hJSONObject
+    mov eax, hJSONObject
+    ret
+cJSON_AddObjectToArray ENDP
+
+cJSON_AddArrayToArray PROC hJSON:DWORD
+    LOCAL hJSONObjectArray:DWORD
+    Invoke cJSON_CreateArray
+    mov hJSONObjectArray, eax
+    Invoke cJSON_AddItemToArray, hJSON, hJSONObjectArray
+    mov eax, hJSONObjectArray
+    ret
+cJSON_AddArrayToArray ENDP
+
+cJSON_AddNullToArray PROC hJSON:DWORD
+    LOCAL hJSONObjectNull:DWORD
+    Invoke cJSON_CreateNull
+    mov hJSONObjectNull, eax
+    Invoke cJSON_AddItemToArray, hJSON, hJSONObjectNull
+    mov eax, hJSONObjectNull
+    ret
+cJSON_AddNullToArray ENDP
+
+cJSON_AddTrueToArray PROC hJSON:DWORD
+    LOCAL hJSONObjectTrue:DWORD
+    Invoke cJSON_CreateTrue
+    mov hJSONObjectTrue, eax
+    Invoke cJSON_AddItemToArray, hJSON, hJSONObjectTrue
+    mov eax, hJSONObjectTrue
+    ret
+cJSON_AddTrueToArray ENDP
+
+cJSON_AddFalseToArray PROC hJSON:DWORD
+    LOCAL hJSONObjectFalse:DWORD
+    Invoke cJSON_CreateFalse
+    mov hJSONObjectFalse, eax
+    Invoke cJSON_AddItemToArray, hJSON, hJSONObjectFalse
+    mov eax, hJSONObjectFalse
+    ret
+cJSON_AddFalseToArray ENDP
+
+cJSON_AddBoolToArray PROC hJSON:DWORD, dwBoolValue:DWORD
+    LOCAL hJSONObjectBool:DWORD
+    Invoke cJSON_CreateBool, dwBoolValue
+    mov hJSONObjectBool, eax
+    Invoke cJSON_AddItemToArray, hJSON, hJSONObjectBool
+    mov eax, hJSONObjectBool
+    ret
+cJSON_AddBoolToArray ENDP
+
+cJSON_AddNumberToArray PROC hJSON:DWORD, dwNumberValue:DWORD
+    LOCAL hJSONObjectNumber:DWORD
+    LOCAL qwNumberValue:QWORD
+    mov eax, dwNumberValue
+    mov dword ptr [qwNumberValue+0], eax
+    mov dword ptr [qwNumberValue+4], eax
+    Invoke cJSON_CreateNumber, qwNumberValue
+    mov hJSONObjectNumber, eax
+    Invoke cJSON_AddItemToArray, hJSON, hJSONObjectNumber
+    mov eax, hJSONObjectNumber
+    ret
+cJSON_AddNumberToArray ENDP
+
+cJSON_AddStringToArray PROC hJSON:DWORD, lpszString:DWORD
+    LOCAL hJSONObjectString:DWORD
+    Invoke cJSON_CreateString, lpszString
+    mov hJSONObjectString, eax
+    Invoke cJSON_AddItemToArray, hJSON, hJSONObjectString
+    mov eax, hJSONObjectString
+    ret
+cJSON_AddStringToArray ENDP
+
+cJSON_AddRawToArray PROC hJSON:DWORD, lpszRawJson:DWORD
+    LOCAL hJSONObjectRaw:DWORD
+    Invoke cJSON_CreateRaw, lpszRawJson
+    mov hJSONObjectRaw, eax
+    Invoke cJSON_AddItemToArray, hJSON, hJSONObjectRaw
+    mov eax, hJSONObjectRaw
+    ret
+cJSON_AddRawToArray ENDP
 
 
 
