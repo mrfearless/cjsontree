@@ -176,43 +176,43 @@ IDM_CMD_EXPORT_BRANCH_FILE  EQU 11053
 
 .DATA
 ; Right click menu strings:
-szTVRCMenuCollapseBranch    DB 'Collapse Branch',0
-szTVRCMenuExpandBranch      DB 'Expand Branch',0
-szTVRCMenuCollapseAll       DB 'Collapse All',0
-szTVRCMenuExpandAll         DB 'Expand All',0
+szTVRCMenuCollapseBranch    DB 'Collapse Branch',09h,"-",0
+szTVRCMenuExpandBranch      DB 'Expand Branch',09h,"+",0
+szTVRCMenuCollapseAll       DB 'Collapse All',09h,"Ctrl+PageUp",0
+szTVRCMenuExpandAll         DB 'Expand All',09h,"Ctrl+PageDown",0
 szTVRCMenuCopy              DB 'Copy',0
-szTVRCMenuAddItem           DB 'Add Item',0
+szTVRCMenuAddItem           DB 'Add Item',09h,"Insert",0
 szTVRCMenuDelItem           DB 'Delete Item',0
 szTVRCMenuEditItem          DB 'Edit Item',0
 szTVRCMenuExport            DB 'Export',0
 szTVRCMenuPaste             DB 'Paste',0
-szTVRCMenuFindText          DB 'Find...',0
+szTVRCMenuFindText          DB 'Find...',09h,"Ctrl+F",0
 
 ; Right click 'Add' submenu strings:
-szTVRCMenuAddItemString     DB 'Add String',0
-szTVRCMenuAddItemNumber     DB 'Add Number',0
-szTVRCMenuAddItemTrue       DB 'Add True',0
-szTVRCMenuAddItemFalse      DB 'Add False',0
-szTVRCMenuAddItemArray      DB 'Add Array',0
-szTVRCMenuAddItemObject     DB 'Add Object',0
+szTVRCMenuAddItemString     DB 'Add String',09h,"Ctrl+1",0
+szTVRCMenuAddItemNumber     DB 'Add Number',09h,"Ctrl+2",0
+szTVRCMenuAddItemTrue       DB 'Add True',09h,"Ctrl+3",0
+szTVRCMenuAddItemFalse      DB 'Add False',09h,"Ctrl+4",0
+szTVRCMenuAddItemArray      DB 'Add Array',09h,"Ctrl+5",0
+szTVRCMenuAddItemObject     DB 'Add Object',09h,"Ctrl+6",0
 
 ; Right click 'Copy' submenu strings:
-szTVRCMenuCopyText          DB 'Copy Text',0
+szTVRCMenuCopyText          DB 'Copy Text',09h,"Ctrl+C",0
 szTVRCMenuCopyValue         DB 'Copy Value',0
-szTVRCMenuCopyItem          DB 'Copy Item',0
-szTVRCMenuCopyBranch        DB 'Copy Branch',0
+szTVRCMenuCopyItem          DB 'Copy Item',09h,"Ctrl+I",0
+szTVRCMenuCopyBranch        DB 'Copy Branch',09h,"Ctrl+Y",0
 
 ; Right click 'Paste' submenu strings:
-szTVRCMenuPasteItem         DB 'Paste Item',0
-szTVRCMenuPasteBranch       DB 'Paste Branch',0
-szTVRCMenuPasteJSON         DB 'Paste JSON',0
+szTVRCMenuPasteItem         DB 'Paste Item',09h,"Ctrl+O",0
+szTVRCMenuPasteBranch       DB 'Paste Branch',09h,"Ctrl+P",0
+szTVRCMenuPasteJSON         DB 'Paste JSON',09h,"Ctrl+V",0
 szTVRCMenuPasteInsert       DB 'Paste JSON (Insert)',0
 
 ; Right click 'Export' submenu strings:
-szTVRCMenuExportTreeClip    DB 'Export tree to clipboard',0
-szTVRCMenuExportBranchClip  DB 'Export branch to clipboard',0
-szTVRCMenuExportTreeFile    DB 'Export tree to file',0
-szTVRCMenuExportBranchFile  DB 'Export branch to file',0
+szTVRCMenuExportTreeClip    DB 'Export tree to clipboard',09h,"Ctrl+Shift+V",0
+szTVRCMenuExportBranchClip  DB 'Export branch to clipboard',09h,"Ctrl+Shift+X",0
+szTVRCMenuExportTreeFile    DB 'Export tree to file',09h,"Ctrl+Shift+S",0
+szTVRCMenuExportBranchFile  DB 'Export branch to file',09h,"Ctrl+Shift+A",0
 
 ; Options
 szOptionsCaseSensitive      DB '&Case Sensitive Search',0
@@ -764,7 +764,8 @@ MenusUpdate PROC USES EBX hWin:DWORD, hItem:DWORD
     
     Invoke MenuMainUpdate, hWin, bInTV, bHasChildren, bObjectOrArray, bRoot
     Invoke MenuRCUpdate, hWin, bInTV, bHasChildren, bObjectOrArray, bRoot
-
+    Invoke MenuSaveEnable, hWin, g_Edit
+    Invoke MenuSaveAsEnable, hWin, g_Edit
     ret
 MenusUpdate ENDP
 
@@ -863,7 +864,8 @@ MenuOptionsUpdate ENDP
 ;-------------------------------------------------------------------------------------
 ; Update right click menu
 ;-------------------------------------------------------------------------------------
-MenuRCUpdate PROC hWin:DWORD, bInTV:DWORD, bHasChildren:DWORD, bObjectOrArray:DWORD, bRoot:DWORD
+MenuRCUpdate PROC USES EBX hWin:DWORD, bInTV:DWORD, bHasChildren:DWORD, bObjectOrArray:DWORD, bRoot:DWORD
+    LOCAL hItem:DWORD
     LOCAL mi:MENUITEMINFO
     
     mov mi.cbSize, SIZEOF MENUITEMINFO
@@ -877,13 +879,40 @@ MenuRCUpdate PROC hWin:DWORD, bInTV:DWORD, bHasChildren:DWORD, bObjectOrArray:DW
     .ENDIF
     Invoke SetMenuItemInfo, hTVMenu, IDM_CMD_COLLAPSE_ALL, FALSE, Addr mi
     Invoke SetMenuItemInfo, hTVMenu, IDM_CMD_EXPAND_ALL, FALSE, Addr mi
-
+    
+    ; Prevent edit if root and/or an object
+    .IF bInTV == TRUE 
+        Invoke TreeViewGetSelectedItem, hTV
+        mov hItem, eax
+        .IF eax == hTVRoot
+            mov mi.fState, MFS_GRAYED
+        .ELSE
+            .IF bObjectOrArray == TRUE
+                Invoke TreeViewGetItemParam, hTV, hItem
+                .IF eax != NULL ; eax = hJSON
+                    mov ebx, eax
+                    mov eax, [ebx].cJSON.itemtype
+                    .IF eax == cJSON_Object
+                        mov mi.fState, MFS_GRAYED
+                    .ENDIF
+                .ELSE
+                    mov mi.fState, MFS_ENABLED
+                .ENDIF
+            .ELSE
+                mov mi.fState, MFS_ENABLED
+            .ENDIF
+        .ENDIF
+    .ELSE
+        mov mi.fState, MFS_GRAYED
+    .ENDIF
+    Invoke SetMenuItemInfo, hTVMenu, IDM_CMD_EDIT_ITEM, FALSE, Addr mi
+    
     .IF bInTV == TRUE
         mov mi.fState, MFS_ENABLED
     .ELSE
         mov mi.fState, MFS_GRAYED
     .ENDIF
-    Invoke SetMenuItemInfo, hTVMenu, IDM_CMD_EDIT_ITEM, FALSE, Addr mi
+    
     Invoke SetMenuItemInfo, hTVMenu, IDM_CMD_DEL_ITEM, FALSE, Addr mi
     Invoke SetMenuItemInfo, hTVMenu, IDM_CMD_COPY, FALSE, Addr mi
     Invoke SetMenuItemInfo, hTVMenu, IDM_CMD_PASTE, FALSE, Addr mi    
@@ -1019,6 +1048,14 @@ MenuRCExportUpdate PROC hWin:DWORD, bInTV:DWORD, bHasChildren:DWORD, bObjectOrAr
     mov mi.cbSize, SIZEOF MENUITEMINFO
     mov mi.fMask, MIIM_STATE
     
+    .IF bObjectOrArray == TRUE
+        mov mi.fState, MFS_ENABLED
+    .ELSE
+        mov mi.fState, MFS_GRAYED
+    .ENDIF
+    Invoke SetMenuItemInfo, hTVMenu, IDM_CMD_EXPORT_BRANCH_CLIP, FALSE, Addr mi
+    Invoke SetMenuItemInfo, hTVMenu, IDM_CMD_EXPORT_BRANCH_FILE, FALSE, Addr mi
+    
     ret
 MenuRCExportUpdate ENDP
 
@@ -1046,17 +1083,17 @@ MenuRCAddShow PROC hWin:DWORD
     
     mov bShowSubmenu, FALSE
 
-    Invoke GetCursorPos, Addr tvhi.pt
-    Invoke ScreenToClient, hTV, addr tvhi.pt
-    Invoke SendMessage, hTV, TVM_HITTEST, 0, Addr tvhi
-    Invoke SendMessage, hTV, TVM_SELECTITEM, TVGN_CARET, tvhi.hItem
-    mov eax, tvhi.hItem
+    ;Invoke GetCursorPos, Addr tvhi.pt
+    ;Invoke ScreenToClient, hTV, addr tvhi.pt
+    ;Invoke SendMessage, hTV, TVM_HITTEST, 0, Addr tvhi
+    ;Invoke SendMessage, hTV, TVM_SELECTITEM, TVGN_CARET, tvhi.hItem
+    ;mov eax, tvhi.hItem
+    Invoke TreeViewGetSelectedItem, hTV
     mov hItem, eax
-    .IF eax != 0 && tvhi.flags == TVHT_ONITEMLABEL
-        mov hItem, eax
-        Invoke TreeViewItemHasChildren, hTV, hItem
-        mov bShowSubmenu, eax
-        .IF eax == FALSE
+    .IF eax != 0 ;&& tvhi.flags == TVHT_ONITEMLABEL
+        .IF eax == hTVRoot
+            mov bShowSubmenu, TRUE
+        .ELSE
             Invoke TreeViewGetSelectedParam, hTV
             .IF eax != NULL ; eax = hJSON
                 mov ebx, eax

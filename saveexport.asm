@@ -1,6 +1,5 @@
 Spaces                          PROTO :DWORD, :DWORD
-SeperateNameValue               PROTO :DWORD, :DWORD, :DWORD
-SeperateArrayName               PROTO :DWORD, :DWORD
+
 ExportJSONBranchToFile          PROTO :DWORD, :DWORD
 SaveJSONBranchToFile            PROTO :DWORD, :DWORD, :DWORD
 
@@ -60,123 +59,66 @@ Spaces PROC lpszBuffer:DWORD, nAmount:DWORD
 Spaces ENDP
 
 
-;-------------------------------------------------------------------------------------
-; SeperateNameValue - seperates name and value from text string
-;-------------------------------------------------------------------------------------
-SeperateNameValue PROC USES EBX lpszString:DWORD, lpszName:DWORD, lpszValue:DWORD
-    LOCAL dwColonPos:DWORD
-    LOCAL LenString:DWORD
-    
-    .IF lpszString == 0
-        mov ebx, lpszName
-        mov byte ptr [ebx], 0
-        mov ebx, lpszValue
-        mov byte ptr [ebx], 0
-        xor eax, eax
-        ret
-    .ENDIF
-   
-    Invoke szLen, lpszString
-    mov LenString, eax 
-    
-    Invoke InString, 1, lpszString, Addr szColon
-    mov dwColonPos, eax
-    .IF eax != 0 ; match
-        dec dwColonPos ; adjust for 1 based
-        Invoke szLeft, lpszString, lpszName, dwColonPos
-    .ELSE
-        mov ebx, lpszName
-        mov byte ptr [ebx], 0
-        dec dwColonPos ; adjust for 1 based
-    .ENDIF
-    
-    inc dwColonPos  ; adjust for 1 based
-    mov ebx, dwColonPos
-    mov eax, LenString
-    sub eax, ebx
-    .IF sdword ptr eax > 1
-        dec eax ; skip any space
-        Invoke szRight, lpszString, lpszValue, eax
-    .ELSE
-        mov ebx, lpszValue
-        mov byte ptr [ebx], 0    
-    .ENDIF
-    ret
 
-SeperateNameValue ENDP
-
-
-;-------------------------------------------------------------------------------------
-; SeperateArrayName - seperates array name from text string
-;-------------------------------------------------------------------------------------
-SeperateArrayName PROC USES EBX lpszString:DWORD, lpszName:DWORD
-    LOCAL dwBracketPos:DWORD
-    LOCAL LenString:DWORD
-    
-    .IF lpszString == 0
-        mov ebx, lpszName
-        mov byte ptr [ebx], 0
-        xor eax, eax
-        ret
-    .ENDIF
-   
-    Invoke szLen, lpszString
-    mov LenString, eax 
-    
-    Invoke InString, 1, lpszString, Addr szLeftSquareBracket
-    mov dwBracketPos, eax
-    .IF eax != 0 ; match
-        dec dwBracketPos ; adjust for 1 based
-        Invoke szLeft, lpszString, lpszName, dwBracketPos
-    .ELSE
-        mov ebx, lpszName
-        mov byte ptr [ebx], 0
-    .ENDIF
-
-    ret
-
-SeperateArrayName ENDP
 
 
 ;-------------------------------------------------------------------------------------
 ; SaveJSONBranchToFile - saves/exports json data to file
 ;-------------------------------------------------------------------------------------
-ExportJSONBranchToFile PROC hWin:DWORD, hItem:DWORD
+ExportJSONBranchToFile PROC USES EBX hWin:DWORD, hItem:DWORD
+    LOCAL hJSON:DWORD
     LOCAL hItemExport:DWORD
 
     .IF hItem == 0
         Invoke SendMessage, hTV, TVM_GETNEXTITEM, TVGN_ROOT, NULL
+        .IF eax == 0
+            ret
+        .ENDIF
     .ELSE
         mov eax, hItem
     .ENDIF
     mov hItemExport, eax
 
-    Invoke RtlZeroMemory, Addr ExportFile, SIZEOF ExportFile
-    push hWin
-    pop ExportFile.hwndOwner
-    lea eax, JsonExportFileFilter
-    mov ExportFile.lpstrFilter, eax
-    lea eax, JsonExportFilename
-    mov ExportFile.lpstrFile, eax
-    lea eax, JsonExportFileFileTitle
-    mov ExportFile.lpstrTitle, eax
-    mov ExportFile.nMaxFile, SIZEOF JsonExportFilename
-    lea eax, JsonExportDefExt
-    mov ExportFile.lpstrDefExt, eax
-    mov ExportFile.nFilterIndex, 1 ; json
-    mov ExportFile.Flags, OFN_EXPLORER
-    mov ExportFile.lStructSize, SIZEOF ExportFile
-    Invoke GetSaveFileName, Addr ExportFile
+    Invoke TreeViewGetItemParam, hTV, hItemExport
+    .IF eax == NULL
+        ret
+    .ENDIF
+    mov hJSON, eax
     
-    .IF eax !=0
-        Invoke SaveJSONBranchToFile, hWin, Addr JsonExportFilename, hItemExport
-        .IF eax == TRUE
-            Invoke szCopy, Addr szJSONExportFileSuccess, Addr szJSONErrorMessage
-            Invoke szCatStr, Addr szJSONErrorMessage, Addr JsonExportFilename
-            Invoke StatusBarSetPanelText, 2, Addr szJSONErrorMessage
-        .ELSE
-            Invoke StatusBarSetPanelText, 2, Addr szJSONExportFileFailed
+    mov ebx, hJSON
+    mov eax, [ebx].cJSON.itemtype
+    .IF eax == cJSON_Array || eax == cJSON_Object
+        Invoke RtlZeroMemory, Addr ExportFile, SIZEOF ExportFile
+        push hWin
+        pop ExportFile.hwndOwner
+        lea eax, JsonExportFileFilter
+        mov ExportFile.lpstrFilter, eax
+        lea eax, JsonExportFilename
+        mov ExportFile.lpstrFile, eax
+        lea eax, JsonExportFileFileTitle
+        mov ExportFile.lpstrTitle, eax
+        mov ExportFile.nMaxFile, SIZEOF JsonExportFilename
+        lea eax, JsonExportDefExt
+        mov ExportFile.lpstrDefExt, eax
+        mov ExportFile.nFilterIndex, 1 ; json
+        mov ExportFile.Flags, OFN_EXPLORER
+        mov ExportFile.lStructSize, SIZEOF ExportFile
+        Invoke GetSaveFileName, Addr ExportFile
+        
+        .IF eax !=0
+            Invoke SaveJSONBranchToFile, hWin, Addr JsonExportFilename, hItemExport
+            .IF eax == TRUE
+                Invoke szCopy, Addr szJSONExportFileSuccess, Addr szJSONErrorMessage
+                Invoke szCatStr, Addr szJSONErrorMessage, Addr JsonExportFilename
+                Invoke StatusBarSetPanelText, 2, Addr szJSONErrorMessage
+                mov eax, TRUE
+            .ELSE
+                Invoke StatusBarSetPanelText, 2, Addr szJSONExportFileFailed
+                xor eax, eax
+            .ENDIF
         .ENDIF
+    .ELSE
+        xor eax, eax
     .ENDIF
     ret
 ExportJSONBranchToFile ENDP
@@ -185,7 +127,7 @@ ExportJSONBranchToFile ENDP
 ;-------------------------------------------------------------------------------------
 ; SaveJSONBranchToFile - saves/exports json data to file
 ;-------------------------------------------------------------------------------------
-SaveJSONBranchToFile PROC hWin:DWORD, lpszSaveFilename:DWORD, hItem:DWORD
+SaveJSONBranchToFile PROC USES EBX hWin:DWORD, lpszSaveFilename:DWORD, hItem:DWORD
     LOCAL hJSON:DWORD
     LOCAL hFile:DWORD
     LOCAL hItemSave:DWORD
@@ -213,45 +155,52 @@ SaveJSONBranchToFile PROC hWin:DWORD, lpszSaveFilename:DWORD, hItem:DWORD
     mov hItemSave, eax
 
     Invoke TreeViewGetItemParam, hTV, hItemSave
+    .IF eax == NULL
+        ret
+    .ENDIF
     mov hJSON, eax
-    .IF hJSON == NULL
-        ret
-    .ENDIF
-    
-    Invoke CreateFile, lpszSaveFilename, GENERIC_READ + GENERIC_WRITE, FILE_SHARE_READ+FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_FLAG_WRITE_THROUGH, NULL
-    .IF eax == INVALID_HANDLE_VALUE
-        mov eax, FALSE
-        ret
-    .ENDIF
-    mov hFile, eax    
-    
-    Invoke cJSON_PrintBuffered, hJSON, 4096d, TRUE
-    .IF eax != NULL
-        mov pData, eax
-        Invoke szLen, pData
-        mov dwTotalBytesToWrite, eax
         
-        .IF sdword ptr dwTotalBytesToWrite > 0
-            ;PrintDec dwTotalBytesToWrite
-            Invoke SetFilePointer, hFile, 0, 0, FILE_BEGIN	
-            Invoke WriteFile, hFile, pData, dwTotalBytesToWrite, Addr dwTotalBytesWritten, NULL
-            .IF eax != TRUE
-                Invoke GetLastError
-                ;PrintDec eax
+    mov ebx, hJSON
+    mov eax, [ebx].cJSON.itemtype
+    .IF eax == cJSON_Array || eax == cJSON_Object
+    
+        Invoke CreateFile, lpszSaveFilename, GENERIC_READ + GENERIC_WRITE, FILE_SHARE_READ+FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_FLAG_WRITE_THROUGH, NULL
+        .IF eax == INVALID_HANDLE_VALUE
+            mov eax, FALSE
+            ret
+        .ENDIF
+        mov hFile, eax    
+        
+        Invoke cJSON_PrintBuffered, hJSON, 4096d, TRUE
+        .IF eax != NULL
+            mov pData, eax
+            Invoke szLen, pData
+            mov dwTotalBytesToWrite, eax
+            
+            .IF sdword ptr dwTotalBytesToWrite > 0
+                ;PrintDec dwTotalBytesToWrite
+                Invoke SetFilePointer, hFile, 0, 0, FILE_BEGIN	
+                Invoke WriteFile, hFile, pData, dwTotalBytesToWrite, Addr dwTotalBytesWritten, NULL
+                .IF eax != TRUE
+                    Invoke GetLastError
+                    ;PrintDec eax
+                .ENDIF
+                Invoke SetEndOfFile, hFile
+                mov ReturnVal, TRUE
+            .ELSE
+                mov ReturnVal, FALSE
             .ENDIF
-            Invoke SetEndOfFile, hFile
-            mov ReturnVal, TRUE
+            Invoke cJSON_free, pData
         .ELSE
             mov ReturnVal, FALSE
         .ENDIF
-        Invoke cJSON_free, pData
+        
+        Invoke CloseHandle, hFile
+         
+        mov eax, ReturnVal
     .ELSE
-        mov ReturnVal, FALSE
+        mov eax, FALSE
     .ENDIF
-    
-    Invoke CloseHandle, hFile
-     
-    mov eax, ReturnVal
     ret
 SaveJSONBranchToFile ENDP
 

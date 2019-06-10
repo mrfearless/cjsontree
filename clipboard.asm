@@ -13,6 +13,8 @@ CopyBranchToClipboard           PROTO :DWORD, :DWORD            ; hWin, hItemCli
 
 
 .DATA
+szExportTreeClipSuccess         DB 'Copied json tree text to clipboard',0
+szExportBranchClipSuccess       DB 'Copied json branch text to clipboard',0
 szCopyTextSuccess               DB 'Copied json item text to clipboard',0
 szCopyValueSuccess              DB 'Copied json item value to clipboard',0
 szCopyTextEmpty                 DB 'json item text is empty, no text copied to clipboard',0
@@ -223,46 +225,60 @@ CopyBranchToClipboard PROC hWin:DWORD, hItem:DWORD
         ret
     .ENDIF
     
-    Invoke cJSON_PrintBuffered, hJSON, 4096d, TRUE
-    .IF eax != NULL
-        mov ptrClipboardData, eax
-        
-        Invoke OpenClipboard, hWin
-        .IF eax == 0
+    mov ebx, hJSON
+    mov eax, [ebx].cJSON.itemtype
+    .IF eax == cJSON_Array || eax == cJSON_Object    
+        Invoke cJSON_PrintBuffered, hJSON, 4096d, TRUE
+        .IF eax != NULL
+            mov ptrClipboardData, eax
+            
+            Invoke OpenClipboard, hWin
+            .IF eax == 0
+                Invoke cJSON_free, ptrClipboardData
+                xor eax, eax
+                ret
+            .ENDIF
+            Invoke EmptyClipboard
+            
+            Invoke szLen, ptrClipboardData
+            mov LenData, eax
+            inc eax
+            Invoke GlobalAlloc, GMEM_MOVEABLE, eax ;+GMEM_DDESHARE
+            .IF eax == NULL
+                Invoke GlobalFree, ptrClipboardData
+                Invoke CloseClipboard
+                ret
+            .ENDIF
+            mov hClipData, eax
+            
+            Invoke GlobalLock, hClipData
+            .IF eax == NULL
+                Invoke GlobalFree, ptrClipboardData
+                Invoke GlobalFree, hClipData
+                Invoke CloseClipboard
+                ret
+            .ENDIF
+            mov pClipData, eax
+            mov eax, LenData
+            Invoke RtlMoveMemory, pClipData, ptrClipboardData, eax
+            
+            Invoke GlobalUnlock, hClipData 
+            invoke SetClipboardData, CF_TEXT, hClipData
+    
+            Invoke CloseClipboard
             Invoke cJSON_free, ptrClipboardData
+            
+            mov eax, hItemClip
+            .IF eax == hTVRoot
+                Invoke StatusBarSetPanelText, 2, Addr szExportTreeClipSuccess
+            .ELSE
+                Invoke StatusBarSetPanelText, 2, Addr szExportBranchClipSuccess
+            .ENDIF
+            
+            mov eax, TRUE
+        .ELSE
             xor eax, eax
-            ret
         .ENDIF
-        Invoke EmptyClipboard
-        
-        Invoke szLen, ptrClipboardData
-        mov LenData, eax
-        inc eax
-        Invoke GlobalAlloc, GMEM_MOVEABLE, eax ;+GMEM_DDESHARE
-        .IF eax == NULL
-            Invoke GlobalFree, ptrClipboardData
-            Invoke CloseClipboard
-            ret
-        .ENDIF
-        mov hClipData, eax
-        
-        Invoke GlobalLock, hClipData
-        .IF eax == NULL
-            Invoke GlobalFree, ptrClipboardData
-            Invoke GlobalFree, hClipData
-            Invoke CloseClipboard
-            ret
-        .ENDIF
-        mov pClipData, eax
-        mov eax, LenData
-        Invoke RtlMoveMemory, pClipData, ptrClipboardData, eax
-        
-        Invoke GlobalUnlock, hClipData 
-        invoke SetClipboardData, CF_TEXT, hClipData
-
-        Invoke CloseClipboard
-        Invoke cJSON_free, ptrClipboardData
-        mov eax, TRUE
     .ELSE
         xor eax, eax
     .ENDIF

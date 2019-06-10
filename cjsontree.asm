@@ -105,7 +105,6 @@ WinMain proc hInst:HINSTANCE,hPrevInst:HINSTANCE,CmdLine:LPSTR,CmdShow:DWORD
     ret
 WinMain endp
 
-
 ;-------------------------------------------------------------------------------------
 ; WndProc - Main Window Message Loop
 ;-------------------------------------------------------------------------------------
@@ -181,7 +180,6 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
             Invoke ShellAbout,hWin,addr AppName,addr AboutMsg,NULL
         
         .ELSEIF eax == IDM_EDIT_PASTE_JSON || eax == IDM_CMD_PASTE_JSON
-            ;Invoke TreeViewDeleteAll, hTV
             Invoke PasteJSON, hWin
         
         .ELSEIF eax == IDM_EDIT_COPY_TEXT || eax == IDM_CMD_COPY_TEXT
@@ -197,38 +195,34 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
             Invoke JSONCopyItem, NULL, FALSE
             
         .ELSEIF eax == IDM_EDIT_COPY_BRANCH || eax == IDM_CMD_COPY_BRANCH || eax == ACC_EDIT_COPY_BRANCH || eax == TB_EDIT_COPY_BRANCH
-            Invoke JSONCopyBranch, NULL, FALSE
-            ;Invoke CopyBranchToClipboard, hWin
-            ;Invoke TestWalk
-            ;Invoke TreeViewGetSelectedItem, hTV
-            ;Invoke SaveJSONBranchToFile, hWin, Addr szTestFile, eax
-        
+            ;Invoke JSONCopyBranch, NULL, FALSE
+            
         .ELSEIF eax == IDM_EDIT_PASTE_ITEM || eax == IDM_CMD_PASTE_ITEM || eax == ACC_EDIT_PASTE_ITEM || eax == TB_EDIT_PASTE_ITEM
             Invoke JSONPasteItem, hWin, NULL
         
         .ELSEIF eax == IDM_EDIT_PASTE_BRANCH || eax == IDM_CMD_PASTE_BRANCH || eax == ACC_EDIT_PASTE_BRANCH || eax == TB_EDIT_PASTE_BRANCH
-            Invoke JSONPasteBranch, hWin, NULL
+            ;Invoke JSONPasteBranch, hWin, NULL
             
         .ELSEIF eax == IDM_EDIT_FIND || eax == IDM_CMD_FIND || eax == ACC_EDIT_FIND || eax == TB_EDIT_FIND
             Invoke SetFocus, hTxtSearchTextbox
             ;Invoke SearchTextboxStartSearch, hWin
 
-        .ELSEIF eax == IDM_CMD_EXPORT_BRANCH_FILE
+        .ELSEIF eax == IDM_CMD_EXPORT_BRANCH_FILE || eax == ACC_EXPORT_BRANCHFILE
             Invoke TreeViewGetSelectedItem, hTV
             .IF eax != 0
                 Invoke ExportJSONBranchToFile, hWin, eax
             .ENDIF
             
-        .ELSEIF eax == IDM_CMD_EXPORT_ROOT_FILE
+        .ELSEIF eax == IDM_CMD_EXPORT_ROOT_FILE || eax == ACC_EXPORT_TREEFILE
             Invoke ExportJSONBranchToFile, hWin, 0
         
-        .ELSEIF eax == IDM_CMD_EXPORT_BRANCH_CLIP
+        .ELSEIF eax == IDM_CMD_EXPORT_BRANCH_CLIP || eax == ACC_EXPORT_BRANCHCLIP
             Invoke TreeViewGetSelectedItem, hTV
             .IF eax != 0        
                 Invoke CopyBranchToClipboard, hWin, eax
             .ENDIF
             
-        .ELSEIF eax == IDM_CMD_EXPORT_ROOT_CLIP
+        .ELSEIF eax == IDM_CMD_EXPORT_ROOT_CLIP || eax == ACC_EXPORT_TREECLIP
             Invoke CopyBranchToClipboard, hWin, 0
         
         .ELSEIF eax == IDM_CMD_COLLAPSE_BRANCH
@@ -239,14 +233,27 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
             Invoke TreeViewGetSelectedItem, hTV
             Invoke TreeViewBranchExpand, hTV, eax
 
-        .ELSEIF eax == IDM_CMD_COLLAPSE_ALL
-            Invoke TreeViewRootCollapse, hTV
+        .ELSEIF eax == IDM_CMD_COLLAPSE_ALL || eax == ACC_COLLAPSE_ALL
+            .IF hTVEditControl == NULL
+                Invoke TreeViewRootCollapse, hTV
+                Invoke TreeViewSetSelectedItem, hTV, hTVRoot, TRUE
+                Invoke ToolBarUpdate, hWin, hTVRoot
+                Invoke MenusUpdate, hWin, hTVRoot
+                Invoke EditBoxUpdate, hWin, hTVRoot
+            .ENDIF 
             
-        .ELSEIF eax == IDM_CMD_EXPAND_ALL
-            Invoke TreeViewRootExpand, hTV
+        .ELSEIF eax == IDM_CMD_EXPAND_ALL || eax == ACC_EXPAND_ALL
+            .IF hTVEditControl == NULL        
+                Invoke TreeViewRootExpand, hTV
+                Invoke TreeViewSetSelectedItem, hTV, hTVRoot, TRUE
+                Invoke ToolBarUpdate, hWin, hTVRoot
+                Invoke MenusUpdate, hWin, hTVRoot
+                Invoke EditBoxUpdate, hWin, hTVRoot
+            .ENDIF
         
-        .ELSEIF eax == IDM_CMD_ADD_ITEM
+        .ELSEIF eax == IDM_CMD_ADD_ITEM || eax == ACC_EDIT_ADD_ITEM
             ; submenu is processed
+            Invoke MenuRCAddShow, hWin
         
         .ELSEIF eax == TB_ADD_ITEM
             Invoke ToolBarDropdownAddMenuShow, hWin
@@ -257,22 +264,22 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
         .ELSEIF eax == IDM_CMD_EDIT_ITEM
             Invoke JSONEditItem, hWin
             
-        .ELSEIF eax == IDM_CMD_ADD_ITEM_STRING || eax == TB_ADD_ITEM_STRING
+        .ELSEIF eax == IDM_CMD_ADD_ITEM_STRING || eax == TB_ADD_ITEM_STRING || eax == ACC_ADD_ITEM_STRING
             Invoke JSONAddItem, hWin, cJSON_String
             
-        .ELSEIF eax == IDM_CMD_ADD_ITEM_NUMBER || eax == TB_ADD_ITEM_NUMBER
+        .ELSEIF eax == IDM_CMD_ADD_ITEM_NUMBER || eax == TB_ADD_ITEM_NUMBER || eax == ACC_ADD_ITEM_NUMBER
             Invoke JSONAddItem, hWin, cJSON_Number
             
-        .ELSEIF eax == IDM_CMD_ADD_ITEM_TRUE || eax == TB_ADD_ITEM_TRUE
+        .ELSEIF eax == IDM_CMD_ADD_ITEM_TRUE || eax == TB_ADD_ITEM_TRUE || eax == ACC_ADD_ITEM_TRUE
             Invoke JSONAddItem, hWin, cJSON_True
             
-        .ELSEIF eax == IDM_CMD_ADD_ITEM_FALSE || eax == TB_ADD_ITEM_FALSE
+        .ELSEIF eax == IDM_CMD_ADD_ITEM_FALSE || eax == TB_ADD_ITEM_FALSE || eax == ACC_ADD_ITEM_FALSE
             Invoke JSONAddItem, hWin, cJSON_False
             
-        .ELSEIF eax == IDM_CMD_ADD_ITEM_ARRAY || eax == TB_ADD_ITEM_ARRAY
+        .ELSEIF eax == IDM_CMD_ADD_ITEM_ARRAY || eax == TB_ADD_ITEM_ARRAY || eax == ACC_ADD_ITEM_ARRAY
             Invoke JSONAddItem, hWin, cJSON_Array
             
-        .ELSEIF eax == IDM_CMD_ADD_ITEM_OBJECT    || eax == TB_ADD_ITEM_OBJECT        
+        .ELSEIF eax == IDM_CMD_ADD_ITEM_OBJECT    || eax == TB_ADD_ITEM_OBJECT || eax == ACC_ADD_ITEM_OBJECT
             Invoke JSONAddItem, hWin, cJSON_Object
 
 		.ELSEIF eax >= IDM_MRU_1 && eax <= IDM_MRU_9
@@ -418,6 +425,11 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
                     ;mov hTVSelectedItem, eax
                     ;PrintDec hTVSelectedItem
                     ;mov bSearchTermNew, TRUE
+                    
+                    Invoke ToolBarUpdate, hWin, tvhi.hItem
+                    Invoke MenusUpdate, hWin, tvhi.hItem
+                    Invoke EditBoxUpdate, hWin, tvhi.hItem                    
+                    
                 .ENDIF
                 ;Invoke SearchTextboxShow, hWin, FALSE
                 ;Invoke MenusUpdate, hWin, NULL
@@ -425,7 +437,10 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
             
             .ELSEIF eax == NM_DBLCLK
                 Invoke JSONEditItem, hWin
-            
+                
+            ;----------------------------------------------------------
+            ; WM_NOTIFY:TVN_KEYDOWN
+            ;----------------------------------------------------------
             .ELSEIF eax == TVN_KEYDOWN
                 mov ebx, lParam
                 movzx eax, (TV_KEYDOWN ptr [ebx]).wVKey
@@ -465,9 +480,11 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
                     ;.IF eax != 0
             	        Invoke MenuRCAddShow, hWin
                     ;.ENDIF
-
                 .ENDIF
             
+            ;----------------------------------------------------------
+            ; WM_NOTIFY:TVN_SELCHANGED
+            ;----------------------------------------------------------
             .ELSEIF eax == TVN_SELCHANGED
                 mov ebx, lParam
                 mov eax, (NM_TREEVIEW PTR [ebx]).itemNew.hItem
@@ -475,8 +492,29 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
                 Invoke ToolBarUpdate, hWin, hItem
                 Invoke MenusUpdate, hWin, hItem
                 Invoke EditBoxUpdate, hWin, hItem
-                
+            
+            ;----------------------------------------------------------
+            ; WM_NOTIFY:TVN_BEGINLABELEDIT
+            ;----------------------------------------------------------
             .ELSEIF eax == TVN_BEGINLABELEDIT
+                ; Prevent label editing if root and/or an object
+                mov ebx, lParam
+                mov eax, (TV_DISPINFO PTR [ebx]).item.hItem
+                .IF eax == hTVRoot
+                    mov eax, TRUE
+                    ret
+                .ENDIF
+                mov eax, (TV_DISPINFO PTR [ebx]).item.lParam
+                .IF eax != NULL ; eax = hJSON
+                    mov ebx, eax
+                    mov eax, [ebx].cJSON.itemtype
+                    .IF eax == cJSON_Object
+                        mov eax, TRUE
+                        ret
+                    .ENDIF
+                .ENDIF                
+                
+                ; Show Editbox instead? 
                 Invoke EditLabelTextLength, lParam
                 .IF sdword ptr eax > JSON_ITEM_MAX_TEXTLENGTH
                     .IF g_ShowEditBox == 1
@@ -485,18 +523,34 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
                         ret
                     .ENDIF
                 .ENDIF
+                
+                ; Subclass treeview edit control
+                mov eax, hTV
+                mov tve.hTreeview, eax
                 mov ebx, lParam
                 mov eax, (TV_DISPINFO PTR [ebx]).item.pszText
+                mov tve.lpszItemTextOld, eax
                 .IF eax != NULL
                     Invoke szCopy, eax, Addr szTVLabelEditOldText
                 .ENDIF
+                mov ebx, lParam
+                mov eax, (TV_DISPINFO PTR [ebx]).item.hItem
+                mov tve.hItem, eax
+                Invoke TreeViewGetItemParam, hTV, eax
+                mov tve.lParam, eax
                 Invoke SendMessage, hTV, TVM_GETEDITCONTROL, 0, 0
                 mov hTVEditControl, eax
                 Invoke SetWindowLong, hTVEditControl, GWL_WNDPROC, Addr TreeViewEditSubclass
-                Invoke SetWindowLong, hTVEditControl, GWL_USERDATA, eax
+                mov tve.lpdwOldProc, eax
+                Invoke SetWindowLong, hTVEditControl, GWL_USERDATA, Addr tve ;eax
+
+                Invoke TVEditControlSelectInitial, hTVEditControl, tve.lpszItemTextOld, tve.lParam
                 mov eax, FALSE
                 ret
-                
+            
+            ;----------------------------------------------------------
+            ; WM_NOTIFY:TVN_ENDLABELEDIT
+            ;----------------------------------------------------------
             .ELSEIF eax == TVN_ENDLABELEDIT
                 mov ebx, lParam
                 mov eax, (TV_DISPINFO PTR [ebx]).item.pszText
@@ -508,16 +562,22 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
                         mov ebx, lParam
                         mov eax, (TV_DISPINFO PTR [ebx]).item.hItem
                         mov hItem, eax
+                        Invoke JSONUpdateItem, hTV, hItem, Addr szTVLabelEditNewText
                         Invoke ToolBarUpdate, hWin, hItem
                         Invoke MenusUpdate, hWin, hItem
                     .ENDIF
+                    mov hTVEditControl, NULL
                     mov eax, TRUE
                     ret
                 .ELSE
+                    mov hTVEditControl, NULL
                     mov eax, TRUE
                     ret
                 .ENDIF
 
+            ;----------------------------------------------------------
+            ; WM_NOTIFY:TVN_BEGINDRAG
+            ;----------------------------------------------------------
             .ELSEIF eax == TVN_BEGINDRAG
                 mov ebx, lParam
                 Invoke SendMessage, hTV, TVM_CREATEDRAGIMAGE, 0, (NM_TREEVIEW ptr [ebx]).itemNew.hItem
@@ -527,7 +587,6 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
                 Invoke ImageList_DragEnter, hTV, (NM_TREEVIEW ptr [ebx]).ptDrag.x, (NM_TREEVIEW ptr [ebx]).ptDrag.y
                 Invoke SetCapture, hWin
                 mov g_DragMode, TRUE
-
             .ENDIF
         
         .ELSE
@@ -539,7 +598,17 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
             .ENDIF
             
         .ENDIF
-
+    
+    .ELSEIF eax == WM_TIMER
+        mov eax, wParam
+        .IF eax == TIMER_ARRAY_UPDATE_ID
+            .IF hTVArrayUpdate != 0
+                Invoke KillTimer, hWin, TIMER_ARRAY_UPDATE_ID
+                Invoke JSONUpdateArrayCount, hTVArrayUpdate
+                mov hTVArrayUpdate, NULL
+            .ENDIF
+        .ENDIF
+    
     .ELSEIF eax == WM_CLOSE
         .IF g_Edit == TRUE
     		Invoke MessageBox, hWin, Addr szJSONSaveChanges, Addr AppName, MB_ICONQUESTION+MB_YESNO
@@ -560,7 +629,6 @@ WndProc proc USES EBX hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
     ret
 WndProc endp
 
-
 ;-------------------------------------------------------------------------------------
 ; CmdLineProcess - has user passed a file at the command line 
 ;-------------------------------------------------------------------------------------
@@ -573,7 +641,6 @@ CmdLineProcess PROC
     .ENDIF
     ret
 CmdLineProcess endp
-
 
 ;------------------------------------------------------------------------------
 ; Opens a file from the command line or shell explorer call
@@ -604,7 +671,6 @@ CmdLineOpenFile PROC hWin:DWORD
     .ENDIF
     ret
 CmdLineOpenFile endp
-
 
 ;-------------------------------------------------------------------------------------
 ; InitGUI - Initialize GUI stuff
@@ -720,7 +786,6 @@ InitGUI PROC USES EBX hWin:DWORD
 
 InitGUI ENDP
 
-
 ;-------------------------------------------------------------------------------------
 ; ResetGUI - reset GUI back to normal - like when closing a file etc
 ;-------------------------------------------------------------------------------------
@@ -765,22 +830,32 @@ TreeViewInit PROC hWin:DWORD
     ret
 TreeViewInit ENDP
 
-
 ;-------------------------------------------------------------------------------------
 ; Subclass to capture and handle enter key pressed in labels
 ;-------------------------------------------------------------------------------------
 TreeViewSubclass PROC hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
 	mov eax, uMsg
 	.IF eax == WM_GETDLGCODE
-	    mov eax, DLGC_WANTARROWS or DLGC_WANTTAB ;or DLGC_WANTALLKEYS ; DLGC_WANTARROWS or 
+	    mov eax, DLGC_WANTARROWS or DLGC_WANTTAB or DLGC_WANTALLKEYS ; DLGC_WANTARROWS or 
 	    ret
-	    
+	
+	.ELSEIF eax == WM_COMMAND
+        mov eax, lParam
+		.IF eax == hTVEditControl
+		    mov eax, wParam
+		    shr eax, 16		
+    		.IF eax == EN_CHANGE ; Treeview Edit control is subclassed but sents WM_COMMAND to parent
+    		    Invoke TreeViewEditValidate, hWin, lParam
+    		    Invoke UpdateWindow, hTVEditControl
+    		.ENDIF
+        .ENDIF
+	
     .ELSEIF eax == WM_CHAR
         mov eax, wParam
-        .IF eax == VK_TAB
+        .IF eax == VK_TAB || eax == VK_ADD || eax == VK_SUBTRACT ;|| eax == VK_LEFT || eax == VK_RIGHT ;|| eax == VK_INSERT
             xor eax, eax
             ret
-
+            
         .ELSE
 	        Invoke GetWindowLong, hWin, GWL_USERDATA
 	        Invoke CallWindowProc, eax, hWin, uMsg, wParam, lParam
@@ -793,6 +868,24 @@ TreeViewSubclass PROC hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
             Invoke SetFocus, hTxtSearchTextbox
             xor eax, eax
             ret
+        
+;        .ELSEIF eax == VK_INSERT
+;            ;PrintText 'WM_KEYDOWN:VK_INSERT'
+;	        Invoke GetWindowLong, hWin, GWL_USERDATA
+;	        Invoke CallWindowProc, eax, hWin, uMsg, wParam, lParam
+;	        ret
+;	        
+;        .ELSEIF eax == VK_LEFT
+;            PrintText 'WM_KEYDOWN:VK_LEFT'
+;	        Invoke GetWindowLong, hWin, GWL_USERDATA
+;	        Invoke CallWindowProc, eax, hWin, uMsg, wParam, lParam
+;	        ret
+;	        
+;        .ELSEIF eax == VK_RIGHT
+;            PrintText 'WM_KEYDOWN:VK_RIGHT'
+;	        Invoke GetWindowLong, hWin, GWL_USERDATA
+;	        Invoke CallWindowProc, eax, hWin, uMsg, wParam, lParam
+;	        ret
             
 ;        .ELSEIF eax == VK_F
 ;            Invoke GetAsyncKeyState, VK_CONTROL
@@ -823,27 +916,342 @@ TreeViewSubclass PROC hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
     ret
 TreeViewSubclass ENDP
 
-
 ;-------------------------------------------------------------------------------------
 ; Subclass to capture and handle enter key pressed in labels
 ;-------------------------------------------------------------------------------------
 TreeViewEditSubclass PROC hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
+    
 	mov eax, uMsg
 	.IF eax == WM_GETDLGCODE
 	    mov eax, DLGC_WANTALLKEYS
 	    ret
     
+;    .ELSEIF eax == WM_CHAR
+;        PrintText 'TreeViewEditSubclass:WM_CHAR'
+;        mov eax, wParam
+;        .IF eax == VK_RETURN
+;            PrintText 'TreeViewEditSubclass:WM_CHAR:VK_RETURN'
+;            xor eax, eax
+;            ret
+;        .ENDIF
+    
+;    .ELSEIF eax == WM_KEYDOWN
+;        PrintText 'TreeViewEditSubclass:WM_KEYDOWN'
+;        mov eax, wParam
+;        .IF eax == VK_RETURN
+;            PrintText 'TreeViewEditSubclass:WM_KEYDOWN:VK_RETURN'
+;            xor eax, eax
+;            ret
+;        .ENDIF
+    
 	.ELSE
 	    Invoke GetWindowLong, hWin, GWL_USERDATA
+	    mov eax, [eax].TVEDIT.lpdwOldProc
 	    Invoke CallWindowProc, eax, hWin, uMsg, wParam, lParam
 	    ret
 	.ENDIF
 
 	Invoke GetWindowLong, hWin, GWL_USERDATA
+	mov eax, [eax].TVEDIT.lpdwOldProc
 	Invoke CallWindowProc, eax, hWin, uMsg, wParam, lParam
     ret
 TreeViewEditSubclass ENDP
 
+;-------------------------------------------------------------------------------------
+; TreeViewEditValidate - validate text in treeview edit control
+;-------------------------------------------------------------------------------------
+TreeViewEditValidate PROC USES EBX hWin:DWORD, hEdit:DWORD
+    LOCAL lpTveditStruct:DWORD
+    LOCAL hTreeview:DWORD
+    LOCAL hItem:DWORD
+    LOCAL hJSON:DWORD
+    LOCAL jsontype:DWORD
+    LOCAL lpszItemTextOld:DWORD
+    LOCAL dwLengthItemTextName:DWORD
+    LOCAL dwLengthItemTextValue:DWORD
+    LOCAL dwArrayCount:DWORD
+    
+    ;PrintText 'TreeViewEditValidate'
+    
+    Invoke GetWindowLong, hEdit, GWL_USERDATA
+    mov lpTveditStruct, eax
+    mov ebx, eax
+    
+    mov eax, [ebx].TVEDIT.lParam
+    mov hJSON, eax
+    mov eax, [ebx].TVEDIT.hItem
+    mov hItem, eax
+    mov eax, [ebx].TVEDIT.hTreeview
+    mov hTreeview, eax
+    mov eax, [ebx].TVEDIT.lpszItemTextOld
+    mov lpszItemTextOld, eax
+    mov ebx, hJSON
+    mov eax, [ebx].cJSON.itemtype
+    mov jsontype, eax
+    
+    Invoke GetWindowText, hEdit, Addr szItemTextString, SIZEOF szItemTextString
+    .IF eax != 0
+        ;PrintText 'SeperateNameValue'
+        Invoke SeperateNameValue, Addr szItemTextString, Addr szItemTextName, Addr szItemTextValue
+        Invoke lstrlen, Addr szItemTextName
+        mov dwLengthItemTextName, eax
+        Invoke lstrlen, Addr szItemTextValue
+        mov dwLengthItemTextValue, eax
+        ;PrintDec dwLengthItemTextName
+        ;PrintDec dwLengthItemTextValue
+        
+        mov eax, jsontype
+        .IF eax == cJSON_False
+            .IF dwLengthItemTextName == 0
+                Invoke lstrcpy, Addr szItemText, Addr szDefaultFalse
+                Invoke SetWindowText, hEdit, Addr szItemText
+                Invoke SendMessage, hEdit, EM_SETSEL, 0, 9
+            .ELSE        
+                .IF dwLengthItemTextValue == 0
+                    Invoke lstrcpy, Addr szItemText, Addr szItemTextName
+                    Invoke lstrcat, Addr szItemText, CTEXT(": false")
+                    Invoke SetWindowText, hEdit, Addr szItemText
+                    Invoke SendMessage, hEdit, EM_SETSEL, 0, dwLengthItemTextName
+                .ENDIF
+            .ENDIF
+            
+        .ELSEIF eax == cJSON_True
+            .IF dwLengthItemTextName == 0
+                Invoke lstrcpy, Addr szItemText, Addr szDefaultTrue
+                Invoke SetWindowText, hEdit, Addr szItemText
+                Invoke SendMessage, hEdit, EM_SETSEL, 0, 8
+            .ELSE        
+                .IF dwLengthItemTextValue == 0
+                    Invoke lstrcpy, Addr szItemText, Addr szItemTextName
+                    Invoke lstrcat, Addr szItemText, CTEXT(": true")
+                    Invoke SetWindowText, hEdit, Addr szItemText
+                    Invoke SendMessage, hEdit, EM_SETSEL, 0, dwLengthItemTextName
+                .ENDIF
+            .ENDIF
+            
+        .ELSEIF eax == cJSON_NULL
+            .IF dwLengthItemTextName == 0
+                Invoke lstrcpy, Addr szItemText, Addr szDefaultNull
+                Invoke SetWindowText, hEdit, Addr szItemText
+                Invoke SendMessage, hEdit, EM_SETSEL, 0, 4
+            .ELSE
+                .IF dwLengthItemTextValue == 0
+                    Invoke lstrcpy, Addr szItemText, Addr szItemTextName
+                    Invoke lstrcat, Addr szItemText, CTEXT(": null")
+                    Invoke SetWindowText, hEdit, Addr szItemText
+                    Invoke SendMessage, hEdit, EM_SETSEL, 0, dwLengthItemTextName
+                .ENDIF
+            .ENDIF
+            
+        .ELSEIF eax == cJSON_Number
+            .IF dwLengthItemTextName == 0
+                ;PrintDec dwLengthItemTextValue
+                ;PrintString szItemTextValue
+                Invoke lstrcpy, Addr szItemText, Addr szDefaultNumber
+                .IF dwLengthItemTextValue == 0
+                    Invoke lstrcat, Addr szItemText, CTEXT("0")
+                .ELSE
+                    Invoke lstrcat, Addr szItemText, Addr szItemTextValue
+                .ENDIF
+                ;PrintString szItemText
+                Invoke SetWindowText, hEdit, Addr szItemText
+                Invoke SendMessage, hEdit, EM_SETSEL, 8, -1
+            .ELSE
+               .IF dwLengthItemTextValue == 0
+                    ;PrintText 'dwLengthItemTextValue == 0'
+                    Invoke lstrcpy, Addr szItemText, Addr szItemTextName
+                    Invoke lstrcat, Addr szItemText, CTEXT(": 0")
+                    Invoke SetWindowText, hEdit, Addr szItemText
+                    mov eax, dwLengthItemTextName
+                    add eax, 2
+                    Invoke SendMessage, hEdit, EM_SETSEL, eax, -1
+                .ENDIF
+            .ENDIF
+            
+        .ELSEIF eax == cJSON_String
+            .IF dwLengthItemTextName == 0
+                Invoke lstrcpy, Addr szItemText, Addr szDefaultString
+                .IF dwLengthItemTextValue == 0
+                .ELSE
+                    Invoke lstrcat, Addr szItemText, Addr szItemTextValue
+                .ENDIF
+                Invoke SetWindowText, hEdit, Addr szItemText
+                Invoke SendMessage, hEdit, EM_SETSEL, 8, -1
+            .ELSE          
+                .IF dwLengthItemTextValue == 0
+                    Invoke lstrcpy, Addr szItemText, Addr szItemTextName
+                    Invoke lstrcat, Addr szItemText, CTEXT(": ")
+                    Invoke SetWindowText, hEdit, Addr szItemText
+                    mov eax, dwLengthItemTextName
+                    add eax, 2
+                    Invoke SendMessage, hEdit, EM_SETSEL, eax, -1
+                .ENDIF
+            .ENDIF
+            
+        .ELSEIF eax == cJSON_Array
+;            Invoke SeperateArrayName, Addr szItemTextString, Addr szItemTextName
+;            PrintString szItemTextName
+;            Invoke lstrlen, Addr szItemTextName
+;            mov dwLengthItemTextName, eax
+;            PrintDec dwLengthItemTextName
+;            .IF dwLengthItemTextName == 0
+;                Invoke lstrcpy, Addr szItemText, Addr szDefaultArray
+;            .ELSE
+;                Invoke lstrcpy, Addr szItemText, Addr szItemTextName
+;            .ENDIF
+;            Invoke cJSON_GetArraySize, hJSON
+;            mov dwArrayCount, eax
+;            Invoke dwtoa, dwArrayCount, Addr szItemIntValue
+;            Invoke szCatStr, Addr szItemText, Addr szLeftSquareBracket
+;            Invoke szCatStr, Addr szItemText, Addr szItemIntValue
+;            Invoke szCatStr, Addr szItemText, Addr szRightSquareBracket
+;            Invoke SetWindowText, hEdit, Addr szItemText
+;            .IF dwLengthItemTextName == 0
+;                Invoke SendMessage, hEdit, EM_SETSEL, 0, 5
+;            .ELSE
+;                mov eax, dwLengthItemTextName
+;                Invoke SendMessage, hEdit, EM_SETSEL, eax, eax
+;            .ENDIF
+        
+        .ELSEIF eax == cJSON_Object
+            Invoke SetWindowText, hEdit, Addr szDefaultObject
+            Invoke SendMessage, hEdit, EM_SETSEL, 0, -1
+            
+        .ENDIF
+        
+    .ELSE ; no text, so set default
+        mov eax, jsontype
+        .IF eax == cJSON_False
+            Invoke SetWindowText, hEdit, Addr szDefaultFalse
+            Invoke SendMessage, hEdit, EM_SETSEL, 0, 9
+            
+        .ELSEIF eax == cJSON_True
+            Invoke SetWindowText, hEdit, Addr szDefaultTrue
+            Invoke SendMessage, hEdit, EM_SETSEL, 0, 8
+            
+        .ELSEIF eax == cJSON_NULL
+            Invoke SetWindowText, hEdit, Addr szDefaultNull
+            Invoke SendMessage, hEdit, EM_SETSEL, 0, 4
+            
+        .ELSEIF eax == cJSON_Number
+            Invoke SetWindowText, hEdit, Addr szDefaultNumber
+            Invoke SendMessage, hEdit, EM_SETSEL, 8, -1
+            
+        .ELSEIF eax == cJSON_String
+            Invoke SetWindowText, hEdit, Addr szDefaultString
+            Invoke SendMessage, hEdit, EM_SETSEL, 8, -1
+            
+        .ELSEIF eax == cJSON_Array
+            Invoke SetWindowText, hEdit, Addr szDefaultArray
+            Invoke SendMessage, hEdit, EM_SETSEL, 0, -1
+        
+        .ELSEIF eax == cJSON_Object
+            Invoke SetWindowText, hEdit, Addr szDefaultObject
+            Invoke SendMessage, hEdit, EM_SETSEL, 0, -1
+            
+        .ENDIF
+    .ENDIF
+
+    mov eax, TRUE
+    ret
+TreeViewEditValidate ENDP
+
+;-------------------------------------------------------------------------------------
+; TVEditControlSelectInitial - Selects the value (or name) of the text control (name: value)
+;-------------------------------------------------------------------------------------
+TVEditControlSelectInitial PROC USES EBX hEdit:DWORD, lpszEditText:DWORD, hJSON:DWORD
+    LOCAL dwLenEditText:DWORD
+    LOCAL dwCurPos:DWORD
+    LOCAL dwSepPos:DWORD
+    LOCAL jsontype:DWORD
+    
+    .IF lpszEditText == 0
+        xor eax, eax
+        ret
+    .ENDIF
+
+    Invoke lstrlen, lpszEditText
+    .IF eax == 0
+        xor eax, eax
+        ret
+    .ENDIF
+    mov dwLenEditText, eax
+
+    mov ebx, hJSON
+    mov eax, [ebx].cJSON.itemtype
+    mov jsontype, eax    
+    
+    mov dwSepPos, 0
+    mov eax, 0
+    mov dwCurPos, 0
+
+    .WHILE eax < dwLenEditText
+        mov ebx, lpszEditText
+        add ebx, dwCurPos
+        movzx eax, byte ptr [ebx]
+        .IF al == ':'
+            inc dwCurPos
+            mov eax, jsontype
+            .IF eax == cJSON_False || eax == cJSON_True || eax == cJSON_NULL
+            .ELSE
+                movzx eax, byte ptr [ebx+1]
+                .IF al == ' '
+                    inc dwCurPos
+                .ENDIF
+            .ENDIF
+            mov eax, dwCurPos
+            mov dwSepPos, eax
+            .BREAK
+        .ELSEIF al == '['
+            mov eax, jsontype
+            .IF eax == cJSON_Array
+                mov eax, dwCurPos
+                mov dwSepPos, eax
+                .BREAK
+            .ENDIF
+        .ENDIF
+        
+        inc dwCurPos
+        mov eax, dwCurPos
+    .ENDW
+    
+    .IF dwSepPos == 0 ; select all
+        Invoke SendMessage, hEdit, EM_SETSEL, 0, -1
+    .ELSE
+        mov eax, jsontype
+        .IF eax == cJSON_False
+            dec dwSepPos
+            Invoke SendMessage, hEdit, EM_SETSEL, 0, dwSepPos
+            
+        .ELSEIF eax == cJSON_True
+            dec dwSepPos
+            Invoke SendMessage, hEdit, EM_SETSEL, 0, dwSepPos
+            
+        .ELSEIF eax == cJSON_NULL
+            dec dwSepPos
+            Invoke SendMessage, hEdit, EM_SETSEL, 0, dwSepPos
+            
+        .ELSEIF eax == cJSON_Number
+            Invoke SendMessage, hEdit, EM_SETSEL, dwSepPos, -1
+            
+        .ELSEIF eax == cJSON_String
+            Invoke SendMessage, hEdit, EM_SETSEL, dwSepPos, -1
+            
+        .ELSEIF eax == cJSON_Array
+            Invoke SendMessage, hEdit, EM_SETSEL, 0, -1 ;dwSepPos
+        
+        .ELSEIF eax == cJSON_Object
+            Invoke SendMessage, hEdit, EM_SETSEL, 0, -1
+        
+        .ELSE
+            Invoke SendMessage, hEdit, EM_SETSEL, 0, -1
+        .ENDIF
+        
+    .ENDIF
+    
+    mov eax, TRUE
+    ret
+TVEditControlSelectInitial ENDP
 
 
 ;-------------------------------------------------------------------------------------
@@ -876,7 +1284,6 @@ JSONFileOpenBrowse PROC hWin:DWORD
     ret
 
 JSONFileOpenBrowse ENDP
-
 
 ;-------------------------------------------------------------------------------------
 ; JSONFileOpen - Open JSON file to process
@@ -942,7 +1349,6 @@ JSONFileOpen PROC hWin:DWORD, lpszJSONFile:DWORD
 
 JSONFileOpen ENDP
 
-
 ;-------------------------------------------------------------------------------------
 ; JSONFileClose - Closes JSON file and deletes any treeview data and json data
 ;-------------------------------------------------------------------------------------
@@ -984,7 +1390,6 @@ JSONFileClose PROC hWin:DWORD
     ret
 JSONFileClose ENDP
 
-
 ;-------------------------------------------------------------------------------------
 ; CloseJSONFileHandles
 ;-------------------------------------------------------------------------------------
@@ -1005,7 +1410,6 @@ CloseJSONFileHandles PROC hWin:DWORD
     ret
 
 CloseJSONFileHandles ENDP
-
 
 ;-------------------------------------------------------------------------------------
 ; JSONFileSave - Saves json file
@@ -1083,7 +1487,6 @@ JSONFileSave PROC hWin:DWORD, bSaveAs:DWORD
     .ENDIF    
     ret
 JSONFileSave ENDP
-
 
 ;-------------------------------------------------------------------------------------
 ; ProcessJSONFile - Process JSON file and load data into treeview
@@ -1620,8 +2023,8 @@ ProcessingExit:
     
     ;Invoke cJSON_free, hJSON_Object_Root ; Clear up the mem alloced by cJSON_Parse
 
-    Invoke MenusUpdate, hWin, NULL
-    Invoke ToolBarUpdate, hWin, NULL
+    Invoke MenusUpdate, hWin, hTVRoot
+    Invoke ToolBarUpdate, hWin, hTVRoot
     Invoke MenuSaveAsEnable, hWin, TRUE
     Invoke ToolbarButtonSaveAsEnable, hWin, TRUE
     
@@ -1631,7 +2034,6 @@ ProcessingExit:
     
     ret
 JSONDataProcess ENDP
-
 
 ;-------------------------------------------------------------------------------------
 ; updated editbox with text from selected treeview item
@@ -1687,7 +2089,6 @@ EditBoxUpdate PROC USES EBX hWin:DWORD, hItem:DWORD
     ret
 EditBoxUpdate ENDP
 
-
 ;-------------------------------------------------------------------------------------
 ; Checks label text length or underlying json text string length
 ;-------------------------------------------------------------------------------------
@@ -1730,7 +2131,6 @@ EditLabelTextLength PROC USES EBX lParam:DWORD
 EditLabelTextLength ENDP
 
 
-
 ;-------------------------------------------------------------------------------------
 ; Sets window title
 ;-------------------------------------------------------------------------------------
@@ -1748,8 +2148,6 @@ SetWindowTitle PROC hWin:DWORD, lpszTitleText:DWORD
     Invoke SetWindowText, hWin, Addr TitleText
     ret
 SetWindowTitle ENDP
-
-
 
 ;**************************************************************************
 ; Strip path name to just filename with extention
@@ -1798,7 +2196,6 @@ JustFnameExt PROC USES ESI EDI szFilePathName:DWORD, szFileName:DWORD
 	ret
 
 JustFnameExt	ENDP
-
 
 ;**************************************************************************
 ;
@@ -1874,11 +2271,12 @@ NewLineReplace PROC USES EBX EDI ESI src:DWORD,dst:DWORD
 
 NewLineReplace ENDP
 
+
 cJSON_AddNumberToObjectEx PROC hJSON:DWORD, lpszName:DWORD, dwNumberValue:DWORD
     LOCAL hJSONObjectNumber:DWORD
     LOCAL qwNumberValue:QWORD
     mov eax, dwNumberValue
-    mov dword ptr [qwNumberValue+0], eax
+    mov dword ptr [qwNumberValue+0], 0
     mov dword ptr [qwNumberValue+4], eax
     Invoke cJSON_CreateNumber, qwNumberValue
     mov hJSONObjectNumber, eax
@@ -1886,6 +2284,31 @@ cJSON_AddNumberToObjectEx PROC hJSON:DWORD, lpszName:DWORD, dwNumberValue:DWORD
     mov eax, hJSONObjectNumber
     ret
 cJSON_AddNumberToObjectEx ENDP
+
+
+cJSON_SetIntegerValue PROC USES EBX hJSON:DWORD, dwIntegerValue:DWORD
+    LOCAL qwNumberValue:QWORD
+    
+    mov ebx, hJSON
+    .IF [ebx].cJSON.itemtype != cJSON_Number
+        mov eax, NULL
+        ret
+    .ENDIF
+    mov eax, dwIntegerValue
+    mov [ebx].cJSON.valueint, eax    
+
+    finit
+    fild dwIntegerValue
+    fstp qword ptr [qwNumberValue]
+    
+    mov eax, dword ptr [qwNumberValue]
+    mov dword ptr [ebx].cJSON.valuedouble, eax
+    mov eax, dword ptr [qwNumberValue+4]
+    mov dword ptr [ebx+4].cJSON.valuedouble, eax
+    
+    mov eax, hJSON
+    ret
+cJSON_SetIntegerValue ENDP
 
 IFDEF LIBCJSON
 

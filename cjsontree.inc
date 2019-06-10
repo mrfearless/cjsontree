@@ -50,34 +50,36 @@ ResetGUI                        PROTO :DWORD                        ;
 TreeViewInit                    PROTO :DWORD                        ; Initialize treeview
 TreeViewSubclass                PROTO :DWORD,:DWORD,:DWORD,:DWORD   ; Subclass for treeview to handle tab key etc 
 TreeViewEditSubclass            PROTO :DWORD,:DWORD,:DWORD,:DWORD   ; Subclass for treeview label editing control to handle text editing of node item
+TreeViewEditValidate            PROTO :DWORD,:DWORD                 ; Validate treeview edit control text 
+TVEditControlSelectInitial      PROTO :DWORD,:DWORD,:DWORD          ;
 
 JSONFileOpenBrowse              PROTO :DWORD                        ; Browse for a json file to open
-JSONFileOpen                    PROTO :DWORD, :DWORD                ; Opens the specified json filename (from previous browse operation)
-JSONFileSave                    PROTO :DWORD, :DWORD                ; Saves treeview data to a json file (save/saveas)
+JSONFileOpen                    PROTO :DWORD,:DWORD                 ; Opens the specified json filename (from previous browse operation)
+JSONFileSave                    PROTO :DWORD,:DWORD                 ; Saves treeview data to a json file (save/saveas)
 JSONFileClose                   PROTO :DWORD                        ; Closes a json file, resets ui to default state
-JSONDataProcess                 PROTO :DWORD, :DWORD, :DWORD        ; Processes json from an opened file via JSONFileOpen or CmdLineOpenFile or via clipboard text 
+JSONDataProcess                 PROTO :DWORD,:DWORD,:DWORD          ; Processes json from an opened file via JSONFileOpen or CmdLineOpenFile or via clipboard text 
 CloseJSONFileHandles            PROTO :DWORD                        ;
 
 
-EditBoxUpdate                   PROTO :DWORD, :DWORD                ; 
+EditBoxUpdate                   PROTO :DWORD,:DWORD                 ; 
 EditLabelTextLength             PROTO :DWORD
 
-JustFnameExt                    PROTO :DWORD, :DWORD                ; Strips path from full filepath to leave just the filename and extension
-NewLineReplace                  PROTO :DWORD, :DWORD
+JustFnameExt                    PROTO :DWORD,:DWORD                 ; Strips path from full filepath to leave just the filename and extension
+NewLineReplace                  PROTO :DWORD,:DWORD
 
 
-cJSON_AddNumberToObjectEx       PROTO :DWORD, :DWORD, :DWORD        ; 
+cJSON_AddNumberToObjectEx       PROTO :DWORD,:DWORD,:DWORD          ; 
 
 IFDEF LIBCJSON
-cJSON_AddObjectToObject         PROTO :DWORD, :DWORD
-cJSON_AddArrayToObject          PROTO :DWORD, :DWORD
-cJSON_AddNullToObject           PROTO :DWORD, :DWORD
-cJSON_AddTrueToObject           PROTO :DWORD, :DWORD
-cJSON_AddFalseToObject          PROTO :DWORD, :DWORD
-cJSON_AddBoolToObject           PROTO :DWORD, :DWORD, :DWORD
-cJSON_AddNumberToObject         PROTO :DWORD, :DWORD, :DWORD
-cJSON_AddStringToObject         PROTO :DWORD, :DWORD, :DWORD
-cJSON_AddRawToObject            PROTO :DWORD, :DWORD, :DWORD
+cJSON_AddObjectToObject         PROTO :DWORD,:DWORD
+cJSON_AddArrayToObject          PROTO :DWORD,:DWORD
+cJSON_AddNullToObject           PROTO :DWORD,:DWORD
+cJSON_AddTrueToObject           PROTO :DWORD,:DWORD
+cJSON_AddFalseToObject          PROTO :DWORD,:DWORD
+cJSON_AddBoolToObject           PROTO :DWORD,:DWORD,:DWORD
+cJSON_AddNumberToObject         PROTO :DWORD,:DWORD,:DWORD
+cJSON_AddStringToObject         PROTO :DWORD,:DWORD,:DWORD
+cJSON_AddRawToObject            PROTO :DWORD,:DWORD,:DWORD
 ENDIF
 
 cJSON_AddObjectToArray          PROTO :DWORD
@@ -85,33 +87,59 @@ cJSON_AddArrayToArray           PROTO :DWORD
 cJSON_AddNullToArray            PROTO :DWORD
 cJSON_AddTrueToArray            PROTO :DWORD
 cJSON_AddFalseToArray           PROTO :DWORD
-cJSON_AddBoolToArray            PROTO :DWORD, :DWORD
-cJSON_AddNumberToArray          PROTO :DWORD, :DWORD
-cJSON_AddStringToArray          PROTO :DWORD, :DWORD
-cJSON_AddRawToArray             PROTO :DWORD, :DWORD
+cJSON_AddBoolToArray            PROTO :DWORD,:DWORD
+cJSON_AddNumberToArray          PROTO :DWORD,:DWORD
+cJSON_AddStringToArray          PROTO :DWORD,:DWORD
+cJSON_AddRawToArray             PROTO :DWORD,:DWORD
+
+
+TVEDIT                          STRUCT
+    lpdwOldProc                 DD 0
+    hTreeview                   DD 0
+    hItem                       DD 0
+    lpszItemTextOld             DD 0
+    lParam                      DD 0
+TVEDIT                          ENDS
 
 
 .CONST
 ;-----------------------------------------------------------------------------------------
 ; cjsontree Constants
 ;-----------------------------------------------------------------------------------------
+TIMER_ARRAY_UPDATE_ID           EQU 20  ; Event ID
+TIMER_ARRAY_UPDATE_TIME         EQU 500 ; ms
 
 JSON_ITEM_MAX_TEXTLENGTH        EQU 1024d
 
 
 ACCTABLE                        EQU 300
-ACC_FILE_OPEN					EQU 301
-ACC_FILE_CLOSE					EQU 302
-ACC_FILE_NEW					EQU 303
-ACC_FILE_SAVE					EQU 304
-ACC_FILE_SAVEAS					EQU 305
-ACC_EDIT_COPY_ITEM              EQU 306
-ACC_EDIT_COPY_BRANCH            EQU 307
-ACC_EDIT_PASTE_ITEM             EQU 308
-ACC_EDIT_PASTE_BRANCH           EQU 309
-ACC_EDIT_ADD_ITEM               EQU 310
-ACC_EDIT_FIND                   EQU 311
-ACC_OPTIONS_CASESEARCH          EQU 312
+ACC_FILE_OPEN					EQU 301 ; CTRL+O
+ACC_FILE_CLOSE					EQU 302 ; CTRL+F4
+ACC_FILE_NEW					EQU 303 ; CTRL+N
+ACC_FILE_SAVE					EQU 304 ; CTRL+S
+ACC_FILE_SAVEAS					EQU 305 ; CTRL+A
+ACC_EDIT_COPY_ITEM              EQU 306 ; CTRL+I
+ACC_EDIT_COPY_BRANCH            EQU 307 ; CTRL+Y
+ACC_EDIT_PASTE_ITEM             EQU 308 ; CTRL+O
+ACC_EDIT_PASTE_BRANCH           EQU 309 ; CTRL+P
+ACC_EDIT_ADD_ITEM               EQU 310 ; CTRL+INS
+ACC_EDIT_FIND                   EQU 311 ; CTRL+F
+ACC_OPTIONS_CASESEARCH          EQU 312 ; CTRL+Q
+
+ACC_ADD_ITEM_STRING				EQU 331 ; CTRL+1
+ACC_ADD_ITEM_NUMBER				EQU 332 ; CTRL+2
+ACC_ADD_ITEM_TRUE				EQU 333 ; CTRL+3
+ACC_ADD_ITEM_FALSE				EQU 334 ; CTRL+4
+ACC_ADD_ITEM_ARRAY				EQU 335 ; CTRL+5
+ACC_ADD_ITEM_OBJECT				EQU 336 ; CTRL+6
+
+ACC_COLLAPSE_ALL                EQU 350 ; CTRL+PGUP
+ACC_EXPAND_ALL                  EQU 351 ; CTRL+PGDN
+
+ACC_EXPORT_TREECLIP             EQU 360 ; CTRL+SHIFT+V
+ACC_EXPORT_BRANCHCLIP           EQU 361 ; CTRL+SHIFT+X
+ACC_EXPORT_TREEFILE             EQU 362 ; CTRL+SHIFT+S
+ACC_EXPORT_BRANCHFILE           EQU 363 ; CTRL+SHIFT+A
 
 ; Icon Resource IDs
 ICO_MAIN                        EQU 100
@@ -177,6 +205,13 @@ szNullNull                      DB 0,0;'<Null>',0
 szNullInvalid                   DB '<Invalid>',0
 szJSONClipboard                 DB 'JSON source from clipboard',0
 
+szDefaultObject                 DB 'Object',0
+szDefaultArray                  DB 'Array',0
+szDefaultString                 DB 'String: ',0
+szDefaultTrue                   DB 'BoolTrue: true',0
+szDefaultFalse                  DB 'BoolFalse: false',0
+szDefaultNumber                 DB 'Number: ',0
+szDefaultNull                   DB 'Null: null',0
 
 
 ; JSON pointers
@@ -189,7 +224,9 @@ LenItemStringValue              DD 0
 ; JSON Text Buffers
 szItemIntValue                  DB 64 DUP (0)
 szItemText                      DB (JSON_ITEM_MAX_TEXTLENGTH * 2) DUP (0) ; 2048
+szItemTextName                  DB 256 DUP (0)
 szItemTextValue                 DB JSON_ITEM_MAX_TEXTLENGTH DUP (0)
+szJsonStringName                DB 256 DUP (0)
 szItemTextString                DB (JSON_ITEM_MAX_TEXTLENGTH * 2) DUP (0) ; 2048
 szItemTextArrayName             DB 64 DUP (0)
 szSelectedTreeviewText          DB JSON_ITEM_MAX_TEXTLENGTH DUP (0)
@@ -265,6 +302,7 @@ g_EditBoxHeight                 DD 84d ;(21 x 4 lines)
 nStackDepth                     DD 0
 nUniqueCount                    DD 0
 
+tve                             TVEDIT <> ; used in treeview edit control subclass
 dwFileSize                      DD 0
 szFileSize                      DB 32 DUP (0)
 
@@ -306,7 +344,9 @@ JsonExportFileFilter            DB  "JSON Files (*.json)",0,"*.json",0
 JsonExportFileFileTitle         DB  "Export JSON To File...",0
 JsonExportDefExt                DB  "json",0
 
-hTVSelectedItem         DD 0
+hTVSelectedItem                 DD 0
+
+hTVArrayUpdate                  DD 0
 
 .DATA?
 ;-----------------------------------------------------------------------------------------
@@ -348,6 +388,7 @@ hICO_JSON_LOGICAL       DD ?
 hTVRoot                 DD ?
 hTVNode                 DD ?
 hTVCurrentNode          DD ?
+
 hJSONFile               DD ?
 JSONMemMapHandle        DD ?
 JSONMemMapPtr           DD ?
